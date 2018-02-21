@@ -47,7 +47,7 @@ public class RedisMapEventbusTTLMonitor {
 					? redisMapEventbus.getTimeToLiveSeconds() / 2
 					: refreshIntervalSeconds;
 			long delay = intervalSeconds * 1000; // milliseconds
-			log.debug("*** nodeId={}, k={}, delay={}, intervalSeconds={}", nodeId, k, delay, intervalSeconds);
+			// log.debug("*** nodeId={}, k={}, delay={}, intervalSeconds={}", nodeId, k, delay, intervalSeconds);
 			if (clusterManager.isInactive()) {
 				log.warn("inactive nodeId={}, k={}", nodeId, k);
 				return null;
@@ -82,7 +82,7 @@ public class RedisMapEventbusTTLMonitor {
 			});
 			log.debug("nodeId={}, k={}, refreshIntervalSeconds={}, delay={}, timeId={}", nodeId, k,
 					refreshIntervalSeconds, delay, timeId);
-			return null; //timeId;
+			return timeId;
 		});
 	}
 
