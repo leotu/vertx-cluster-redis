@@ -61,7 +61,7 @@ public class RedisClusterManagerTest extends AsyncTestBase {
 		redisson.shutdown(10, 15, TimeUnit.SECONDS);
 	}
 
-	// @Test
+	@Test
 	public void testEventBusP2P() throws Exception {
 		log.debug("BEGIN...");
 

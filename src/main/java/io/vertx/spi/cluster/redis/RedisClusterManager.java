@@ -1,5 +1,7 @@
 package io.vertx.spi.cluster.redis;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
@@ -21,7 +23,6 @@ import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
 import io.vertx.core.eventbus.impl.clustered.ClusteredEventBus;
-import io.vertx.core.eventbus.impl.clustered.ReflectUtil;
 import io.vertx.core.impl.HAManager;
 import io.vertx.core.impl.VertxInternal;
 import io.vertx.core.json.JsonObject;
@@ -58,23 +59,8 @@ public class RedisClusterManager implements ClusterManager {
 	private RedisMapEventbus haInfo;
 	private RedisAsyncMultiMapEventbus subs;
 
-	public static final String CLUSTER_MAP_NAME = "__vertx.haInfo";
-	public static final String SUBS_MAP_NAME = "__vertx.subs";
-	// static {
-	// CLUSTER_MAP_NAME = ReflectUtil.getStaticFinalField(HAManager.class, "CLUSTER_MAP_NAME");
-	// log.debug("CLUSTER_MAP_NAME={}", CLUSTER_MAP_NAME);
-	//
-	// SUBS_MAP_NAME = ReflectUtil.getStaticFinalField(ClusteredEventBus.class, "SUBS_MAP_NAME");
-	// log.debug("SUBS_MAP_NAME={}", SUBS_MAP_NAME);
-	// }
-
-	// public RedisClusterManager(Config config) {
-	// this(Redisson.create(config), UuidUtil.generate32UUID());
-	// }
-	//
-	// public RedisClusterManager(RedissonClient redisson) {
-	// this(redisson, UuidUtil.generate32UUID());
-	// }
+	public static final String CLUSTER_MAP_NAME = "__vertx.haInfo"; // HAManager.class
+	public static final String SUBS_MAP_NAME = "__vertx.subs"; // ClusteredEventBus.class
 
 	public RedisClusterManager(RedissonClient redisson, String nodeID) {
 		Objects.requireNonNull(redisson, "redisson");
@@ -200,11 +186,18 @@ public class RedisClusterManager implements ClusterManager {
 	public boolean isInactive() {
 		final VertxInternal vertxInternal = (VertxInternal) vertx;
 		final ClusteredEventBus eventBus = (ClusteredEventBus) vertx.eventBus();
-		final HAManager haManager = ReflectUtil.getFinalField(eventBus, "haManager");
-		final boolean haManagerStopped = ReflectUtil.getField(haManager, "stopped");
-
-		return vertxInternal.isKilled() || !isActive() || redisson.isShutdown() || redisson.isShuttingDown()
-				|| haManager.isKilled() || haManagerStopped;
+		if (eventBus != null) {
+			final HAManager haManager = getFinalField(eventBus, ClusteredEventBus.class, "haManager");
+			if (haManager != null) {
+				final boolean haManagerStopped = getField(haManager, HAManager.class, "stopped");
+				return vertxInternal.isKilled() || !isActive() || redisson.isShutdown() || redisson.isShuttingDown()
+						|| haManager.isKilled() || haManagerStopped;
+			} else {
+				return vertxInternal.isKilled() || !isActive() || redisson.isShutdown() || redisson.isShuttingDown();
+			}
+		} else {
+			return !isActive() || redisson.isShutdown() || redisson.isShuttingDown();
+		}
 	}
 
 	/**
@@ -355,5 +348,57 @@ public class RedisClusterManager implements ClusterManager {
 			lock.unlock();
 		}
 
+	}
+
+	private <T> T getFinalField(Object reflectObj, Class<?> clsObj, String fieldName) {
+		Objects.requireNonNull(reflectObj, "reflectObj");
+		Objects.requireNonNull(clsObj, "clsObj");
+		Objects.requireNonNull(fieldName, "fieldName");
+		try {
+			Field field = clsObj.getDeclaredField(fieldName);
+			boolean keepStatus = field.isAccessible();
+			if (!keepStatus) {
+				field.setAccessible(true);
+			}
+			try {
+				Field modifiersField = Field.class.getDeclaredField("modifiers");
+				modifiersField.setAccessible(true);
+				modifiersField.setInt(field, field.getModifiers() & ~Modifier.FINAL);
+				//
+				Object fieldObj = field.get(reflectObj);
+				@SuppressWarnings("unchecked")
+				T t = (T) fieldObj;
+				return t;
+			} finally {
+				field.setAccessible(keepStatus);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			throw new RuntimeException(fieldName, e);
+		}
+	}
+
+	private <T> T getField(Object reflectObj, Class<?> clsObj, String fieldName) {
+		Objects.requireNonNull(reflectObj, "reflectObj");
+		Objects.requireNonNull(clsObj, "clsObj");
+		Objects.requireNonNull(fieldName, "fieldName");
+		try {
+			Field field = clsObj.getDeclaredField(fieldName);
+			boolean keepStatus = field.isAccessible();
+			if (!keepStatus) {
+				field.setAccessible(true);
+			}
+			try {
+				Object fieldObj = field.get(reflectObj);
+				@SuppressWarnings("unchecked")
+				T t = (T) fieldObj;
+				return t;
+			} finally {
+				field.setAccessible(keepStatus);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			throw new RuntimeException(fieldName, e);
+		}
 	}
 }

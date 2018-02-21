@@ -48,10 +48,14 @@ public class RedisMapEventbusTTLMonitor {
 					: refreshIntervalSeconds;
 			long delay = intervalSeconds * 1000; // milliseconds
 			log.debug("*** nodeId={}, k={}, delay={}, intervalSeconds={}", nodeId, k, delay, intervalSeconds);
+			if (clusterManager.isInactive()) {
+				log.warn("inactive nodeId={}, k={}", nodeId, k);
+				return null;
+			}
 			long timeId = vertx.setPeriodic(delay, id -> {
 				// log.debug("nodeId={}, k={}, delay={}, now={}", nodeId, k, delay, new Date());
 				if (clusterManager.isInactive()) {
-					log.warn("nodeId={}, k={}, id={}, inactive={}", nodeId, k, id);
+					log.warn("inactive nodeId={}, k={}, id={}", nodeId, k, id);
 					vertx.cancelTimer(id);
 					resetTTL.remove(k, id);
 				} else {
@@ -78,7 +82,7 @@ public class RedisMapEventbusTTLMonitor {
 			});
 			log.debug("nodeId={}, k={}, refreshIntervalSeconds={}, delay={}, timeId={}", nodeId, k,
 					refreshIntervalSeconds, delay, timeId);
-			return timeId;
+			return null; //timeId;
 		});
 	}
 

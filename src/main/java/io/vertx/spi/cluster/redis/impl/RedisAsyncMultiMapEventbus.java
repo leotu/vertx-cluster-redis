@@ -20,11 +20,7 @@ import io.vertx.spi.cluster.redis.RedisClusterManager;
 public class RedisAsyncMultiMapEventbus extends RedisAsyncMultiMap<String, ClusterNodeInfo> {
 	private static final Logger log = LoggerFactory.getLogger(RedisAsyncMultiMapEventbus.class);
 
-//	private boolean batchAtomic = true; // XXX
-//	private int timeToLiveSeconds = 20; // TTL seconds
-	//
-//	private final ConcurrentMap<String, Long> resetTTL = new ConcurrentHashMap<>();
-
+	@SuppressWarnings("unused")
 	private final RedisClusterManager clusterManager;
 
 	public RedisAsyncMultiMapEventbus(Vertx vertx, RedisClusterManager clusterManager, RedissonClient redisson,
