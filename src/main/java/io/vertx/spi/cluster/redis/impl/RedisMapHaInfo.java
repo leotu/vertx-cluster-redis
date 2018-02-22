@@ -20,7 +20,7 @@ import io.vertx.spi.cluster.redis.RedisClusterManager;
 public class RedisMapHaInfo extends RedisMap<String, String> {
 	private static final Logger log = LoggerFactory.getLogger(RedisMapHaInfo.class);
 
-	private int timeToLiveSeconds = 60; // TTL seconds
+	private int timeToLiveSeconds = 10; // TTL seconds
 
 	private final RedisClusterManager clusterManager;
 	private final RMapCache<String, String> mapAsync;
@@ -35,6 +35,10 @@ public class RedisMapHaInfo extends RedisMap<String, String> {
 
 	protected int getTimeToLiveSeconds() {
 		return timeToLiveSeconds;
+	}
+
+	public void setTimeToLiveSeconds(int timeToLiveSeconds) {
+		this.timeToLiveSeconds = timeToLiveSeconds;
 	}
 
 	public void attachListener(NodeListener nodeListener) {
