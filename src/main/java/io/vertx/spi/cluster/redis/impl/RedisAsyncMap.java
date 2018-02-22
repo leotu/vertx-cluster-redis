@@ -38,23 +38,25 @@ public class RedisAsyncMap<K, V> implements AsyncMap<K, V> {
 		this.map = redisson.getMapCache(name);
 	}
 
-	/**
-	 * FIX: Non Vert.x thread
-	 * 
-	 * <pre>
-	 * Thread[redisson-netty-1-6,5,main]
-	 * Thread[vert.x-eventloop-thread-1,5,main]
-	 * </pre>
-	 */
-	protected void runOnContext(Handler<Void> action) {
-		vertx.getOrCreateContext().runOnContext(action);
-		// Vertx.currentContext().runOnContext(action);
-	}
+	// /**
+	// * FIX: Non Vert.x thread
+	// *
+	// * <pre>
+	// * Thread[redisson-netty-1-6,5,main]
+	// * Thread[vert.x-eventloop-thread-1,5,main]
+	// * </pre>
+	// */
+	// protected void runOnContext(Handler<Void> action) {
+	// vertx.getOrCreateContext().runOnContext(action);
+	// }
 
 	@Override
 	public void get(K k, Handler<AsyncResult<V>> resultHandler) {
-		map.getAsync(k).whenComplete((v, e) -> runOnContext(
-				(vd) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v))));
+		map.getAsync(k).whenComplete(
+				(v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
+
+		// map.getAsync(k).whenComplete((v, e) -> runOnContext(
+		// (vd) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v))));
 	}
 
 	@Override
@@ -124,9 +126,6 @@ public class RedisAsyncMap<K, V> implements AsyncMap<K, V> {
 				(v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
 	}
 
-	/**
-	 * Get the keys of the map (Read all keys at once)
-	 */
 	@Override
 	public void keys(Handler<AsyncResult<Set<K>>> resultHandler) {
 		map.readAllKeySetAsync().whenComplete(

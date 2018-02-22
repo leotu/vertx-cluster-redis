@@ -1,7 +1,5 @@
 package io.vertx.spi.cluster.redis;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
@@ -22,9 +20,6 @@ import io.vertx.core.AsyncResult;
 import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
-import io.vertx.core.eventbus.impl.clustered.ClusteredEventBus;
-import io.vertx.core.impl.HAManager;
-import io.vertx.core.impl.VertxInternal;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.shareddata.AsyncMap;
 import io.vertx.core.shareddata.Counter;
@@ -32,11 +27,12 @@ import io.vertx.core.shareddata.Lock;
 import io.vertx.core.spi.cluster.AsyncMultiMap;
 import io.vertx.core.spi.cluster.ClusterManager;
 import io.vertx.core.spi.cluster.NodeListener;
+import io.vertx.spi.cluster.redis.impl.NonPublicSupportAPI;
 import io.vertx.spi.cluster.redis.impl.RedisAsyncMap;
 import io.vertx.spi.cluster.redis.impl.RedisAsyncMultiMap;
-import io.vertx.spi.cluster.redis.impl.RedisAsyncMultiMapEventbus;
+import io.vertx.spi.cluster.redis.impl.RedisAsyncMultiMapSubs;
 import io.vertx.spi.cluster.redis.impl.RedisMap;
-import io.vertx.spi.cluster.redis.impl.RedisMapEventbus;
+import io.vertx.spi.cluster.redis.impl.RedisMapHaInfo;
 
 /**
  * https://github.com/redisson/redisson/wiki/7.-%E5%88%86%E5%B8%83%E5%BC%8F%E9%9B%86%E5%90%88#72-%E5%A4%9A%E5%80%BC%E6%98%A0%E5%B0%84multimap
@@ -56,11 +52,11 @@ public class RedisClusterManager implements ClusterManager {
 	private volatile boolean active;
 	private NodeListener nodeListener;
 
-	private RedisMapEventbus haInfo;
-	private RedisAsyncMultiMapEventbus subs;
+	private RedisMapHaInfo haInfo;
+	private RedisAsyncMultiMapSubs subs;
 
-	public static final String CLUSTER_MAP_NAME = "__vertx.haInfo"; // HAManager.class
-	public static final String SUBS_MAP_NAME = "__vertx.subs"; // ClusteredEventBus.class
+	public static final String CLUSTER_MAP_NAME = NonPublicSupportAPI.HA_CLUSTER_MAP_NAME;
+	public static final String SUBS_MAP_NAME = NonPublicSupportAPI.EB_SUBS_MAP_NAME;
 
 	public RedisClusterManager(RedissonClient redisson, String nodeID) {
 		Objects.requireNonNull(redisson, "redisson");
@@ -68,7 +64,6 @@ public class RedisClusterManager implements ClusterManager {
 		this.redisson = redisson;
 		this.nodeID = nodeID;
 		this.customClient = true;
-		log.debug("nodeID={}", nodeID);
 	}
 
 	public RedisClusterManager(JsonObject config) {
@@ -86,7 +81,6 @@ public class RedisClusterManager implements ClusterManager {
 		this.nodeID = redisHost + "_" + redisPort;
 		this.nodeID = UUID.nameUUIDFromBytes(nodeID.getBytes(StandardCharsets.UTF_8)).toString();
 		this.customClient = false;
-		log.debug("nodeID={}", nodeID);
 	}
 
 	/**
@@ -94,7 +88,6 @@ public class RedisClusterManager implements ClusterManager {
 	 */
 	@Override
 	public void setVertx(Vertx vertx) {
-		log.debug("nodeID={}, vertx={}", nodeID, vertx);
 		this.vertx = vertx;
 	}
 
@@ -104,10 +97,9 @@ public class RedisClusterManager implements ClusterManager {
 	@SuppressWarnings("unchecked")
 	@Override
 	public <K, V> void getAsyncMultiMap(String name, Handler<AsyncResult<AsyncMultiMap<K, V>>> resultHandler) {
-		log.debug("nodeID={}, name={}", nodeID, name);
 		vertx.executeBlocking(future -> {
 			if (name.equals(SUBS_MAP_NAME)) {
-				subs = new RedisAsyncMultiMapEventbus(vertx, this, redisson, name);
+				subs = new RedisAsyncMultiMapSubs(vertx, this, redisson, name);
 				future.complete((AsyncMultiMap<K, V>) subs);
 			} else {
 				future.complete(new RedisAsyncMultiMap<K, V>(vertx, redisson, name));
@@ -117,7 +109,6 @@ public class RedisClusterManager implements ClusterManager {
 
 	@Override
 	public <K, V> void getAsyncMap(String name, Handler<AsyncResult<AsyncMap<K, V>>> resultHandler) {
-		log.debug("nodeID={}, name={}", nodeID, name);
 		vertx.executeBlocking(future -> {
 			future.complete(new RedisAsyncMap<K, V>(vertx, redisson, name));
 		}, resultHandler);
@@ -129,39 +120,28 @@ public class RedisClusterManager implements ClusterManager {
 	@SuppressWarnings("unchecked")
 	@Override
 	public <K, V> Map<K, V> getSyncMap(String name) {
-		log.debug("nodeID={}, name={}", nodeID, name);
 		if (name.equals(CLUSTER_MAP_NAME)) {
-			haInfo = new RedisMapEventbus(vertx, this, redisson, name);
+			haInfo = new RedisMapHaInfo(vertx, this, redisson, name);
 			return (Map<K, V>) haInfo;
 		} else {
 			return new RedisMap<K, V>(vertx, redisson, name);
 		}
 	}
 
-	// protected RedisMapEventbus getHaInfo() {
-	// return haInfo;
-	// }
-	//
-	// protected RedisAsyncMultiMapEventbus getSubs() {
-	// return subs;
-	// }
-
 	@Override
 	public void getLockWithTimeout(String name, long timeout, Handler<AsyncResult<Lock>> resultHandler) {
-		log.debug("nodeID={}, name={}, timeout={}", nodeID, name, timeout);
 		try {
 			RLock lock = redisson.getLock(name); // getFairLock ?
 			lock.tryLockAsync(timeout, TimeUnit.MILLISECONDS).whenComplete((v, e) -> resultHandler
 					.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(new RedisLock(lock))));
 		} catch (Exception e) {
-			log.error("nodeID=" + nodeID + ", name=" + name + ", timeout=" + timeout, e);
+			log.warn("nodeID=" + nodeID + ", name=" + name + ", timeout=" + timeout, e);
 			resultHandler.handle(Future.failedFuture(e));
 		}
 	}
 
 	@Override
 	public void getCounter(String name, Handler<AsyncResult<Counter>> resultHandler) {
-		log.debug("nodeID={}, name={}", nodeID, name);
 		try {
 			RAtomicLong counter = redisson.getAtomicLong(name);
 			resultHandler.handle(Future.succeededFuture(new RedisCounter(counter)));
@@ -176,28 +156,12 @@ public class RedisClusterManager implements ClusterManager {
 		return nodeID;
 	}
 
+	/**
+	 * @see io.vertx.core.impl.HAManager#addHaInfoIfLost
+	 */
 	@Override
 	public List<String> getNodes() {
-		List<String> nodes = haInfo.keySet().stream().map(e -> e.toString()).collect(Collectors.toList());
-		log.debug("nodeID={}, nodes.size={}", nodeID, nodes.size());
-		return nodes;
-	}
-
-	public boolean isInactive() {
-		final VertxInternal vertxInternal = (VertxInternal) vertx;
-		final ClusteredEventBus eventBus = (ClusteredEventBus) vertx.eventBus();
-		if (eventBus != null) {
-			final HAManager haManager = getFinalField(eventBus, ClusteredEventBus.class, "haManager");
-			if (haManager != null) {
-				final boolean haManagerStopped = getField(haManager, HAManager.class, "stopped");
-				return vertxInternal.isKilled() || !isActive() || redisson.isShutdown() || redisson.isShuttingDown()
-						|| haManager.isKilled() || haManagerStopped;
-			} else {
-				return vertxInternal.isKilled() || !isActive() || redisson.isShutdown() || redisson.isShuttingDown();
-			}
-		} else {
-			return !isActive() || redisson.isShutdown() || redisson.isShuttingDown();
-		}
+		return haInfo.keySet().stream().map(e -> e.toString()).collect(Collectors.toList());
 	}
 
 	/**
@@ -205,14 +169,13 @@ public class RedisClusterManager implements ClusterManager {
 	 */
 	@Override
 	public void nodeListener(NodeListener nodeListener) {
-		log.debug("nodeID={}, nodeListener={}", nodeID, nodeListener);
 		this.nodeListener = new NodeListener() {
 			@Override
 			synchronized public void nodeAdded(String nodeID) {
 				if (nodeListener != null && !isInactive()) {
 					nodeListener.nodeAdded(nodeID);
 				} else {
-					log.debug("skip call nodeAdded(...)");
+					log.warn("skip call nodeAdded(...)");
 				}
 			}
 
@@ -221,7 +184,7 @@ public class RedisClusterManager implements ClusterManager {
 				if (nodeListener != null && !isInactive()) {
 					nodeListener.nodeLeft(nodeID);
 				} else {
-					log.debug("skip call nodeLeft(...)");
+					log.warn("skip call nodeLeft(...)");
 				}
 			}
 		};
@@ -233,8 +196,7 @@ public class RedisClusterManager implements ClusterManager {
 	 */
 	@Override
 	public void join(Handler<AsyncResult<Void>> resultHandler) {
-		log.debug("nodeID={}", nodeID);
-		// Thread.dumpStack();
+		// log.debug("^^^^^^^^^^^^^^^^^^^^^^^ nodeID={}", nodeID);
 		vertx.executeBlocking(future -> {
 			if (active) {
 				future.fail(new Exception("already active"));
@@ -250,8 +212,7 @@ public class RedisClusterManager implements ClusterManager {
 	 */
 	@Override
 	public void leave(Handler<AsyncResult<Void>> resultHandler) {
-		log.debug("nodeID={}", nodeID);
-		// Thread.dumpStack();
+		// log.debug("^^^^^^^^^^^^^^^^^^^^^^^ nodeID={}", nodeID);
 		vertx.executeBlocking(future -> {
 			synchronized (RedisClusterManager.this) {
 				if (!active) {
@@ -259,7 +220,7 @@ public class RedisClusterManager implements ClusterManager {
 				} else {
 					active = false;
 					try {
-						haInfo.stop();
+						haInfo.close(); // XXX
 						if (!customClient) {
 							redisson.shutdown(5, 15, TimeUnit.SECONDS);
 						}
@@ -275,8 +236,12 @@ public class RedisClusterManager implements ClusterManager {
 
 	@Override
 	public boolean isActive() {
-		// log.debug("nodeID={}, active={}", nodeID, active);
 		return active;
+	}
+
+	public boolean isInactive() {
+		;
+		return !isActive() || NonPublicSupportAPI.isInactive(vertx, redisson);
 	}
 
 	/**
@@ -330,7 +295,6 @@ public class RedisClusterManager implements ClusterManager {
 			counter.compareAndSetAsync(expected, value).whenComplete(
 					(v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
 		}
-
 	}
 
 	/**
@@ -347,58 +311,6 @@ public class RedisClusterManager implements ClusterManager {
 		public void release() {
 			lock.unlock();
 		}
-
 	}
 
-	private <T> T getFinalField(Object reflectObj, Class<?> clsObj, String fieldName) {
-		Objects.requireNonNull(reflectObj, "reflectObj");
-		Objects.requireNonNull(clsObj, "clsObj");
-		Objects.requireNonNull(fieldName, "fieldName");
-		try {
-			Field field = clsObj.getDeclaredField(fieldName);
-			boolean keepStatus = field.isAccessible();
-			if (!keepStatus) {
-				field.setAccessible(true);
-			}
-			try {
-				Field modifiersField = Field.class.getDeclaredField("modifiers");
-				modifiersField.setAccessible(true);
-				modifiersField.setInt(field, field.getModifiers() & ~Modifier.FINAL);
-				//
-				Object fieldObj = field.get(reflectObj);
-				@SuppressWarnings("unchecked")
-				T t = (T) fieldObj;
-				return t;
-			} finally {
-				field.setAccessible(keepStatus);
-			}
-		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException(fieldName, e);
-		}
-	}
-
-	private <T> T getField(Object reflectObj, Class<?> clsObj, String fieldName) {
-		Objects.requireNonNull(reflectObj, "reflectObj");
-		Objects.requireNonNull(clsObj, "clsObj");
-		Objects.requireNonNull(fieldName, "fieldName");
-		try {
-			Field field = clsObj.getDeclaredField(fieldName);
-			boolean keepStatus = field.isAccessible();
-			if (!keepStatus) {
-				field.setAccessible(true);
-			}
-			try {
-				Object fieldObj = field.get(reflectObj);
-				@SuppressWarnings("unchecked")
-				T t = (T) fieldObj;
-				return t;
-			} finally {
-				field.setAccessible(keepStatus);
-			}
-		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException(fieldName, e);
-		}
-	}
 }

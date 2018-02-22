@@ -27,11 +27,11 @@ import io.vertx.core.impl.ConcurrentHashSet;
 import io.vertx.core.spi.cluster.ChoosableIterable;
 
 /**
+ * 
  * @author Leo Tu - leo.tu.taipei@gmail.com
  */
 @SuppressWarnings("serial")
 class RedisChoosableSet<T> implements ChoosableIterable<T>, Serializable {
-	// private static final Logger log = LoggerFactory.getLogger(RedisChoosableSet.class);
 
 	private final Set<T> ids;
 	private volatile Iterator<T> iter;
@@ -81,9 +81,6 @@ class RedisChoosableSet<T> implements ChoosableIterable<T>, Serializable {
 
 	public void moveToCurrent() {
 		T t = current.get();
-		// if (t == null) {
-		// log.debug("$$$(1) t={}, iter={}, ids.empty={}", t, iter, ids.isEmpty());
-		// }
 		if (t == null || ids.isEmpty()) {
 			return;
 		}
@@ -98,7 +95,6 @@ class RedisChoosableSet<T> implements ChoosableIterable<T>, Serializable {
 				break;
 			}
 		}
-		// log.debug("to current.get={}", current.get());
 	}
 
 	public T getCurrent() {
@@ -111,10 +107,8 @@ class RedisChoosableSet<T> implements ChoosableIterable<T>, Serializable {
 				iter = ids.iterator();
 			}
 			try {
-				// log.debug("*** current.get={}", current.get());
 				T t = iter.next();
 				current.set(t);
-				// log.debug("*** t={}", t);
 				return t;
 			} catch (NoSuchElementException e) {
 				return null;

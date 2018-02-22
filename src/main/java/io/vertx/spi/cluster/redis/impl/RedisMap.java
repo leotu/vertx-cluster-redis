@@ -16,20 +16,21 @@ import io.vertx.core.Vertx;
  * @author Leo Tu - leo.tu.taipei@gmail.com
  */
 public class RedisMap<K, V> implements Map<K, V> {
-	// private static final Logger log = LoggerFactory.getLogger(RedisMap.class);
 
+	protected final Vertx vertx;
 	protected final RMap<K, V> map;
 
 	public RedisMap(Vertx vertx, RMap<K, V> map) {
 		Objects.requireNonNull(map, "map");
+		this.vertx = vertx;
 		this.map = map;
 	}
 
 	public RedisMap(Vertx vertx, RedissonClient redisson, String name) {
 		Objects.requireNonNull(redisson, "redisson");
 		Objects.requireNonNull(name, "name");
+		this.vertx = vertx;
 		this.map = redisson.getMap(name);
-		// log.debug("name={}", name);
 	}
 
 	@Override
@@ -79,16 +80,19 @@ public class RedisMap<K, V> implements Map<K, V> {
 
 	@Override
 	public Set<K> keySet() {
-		return map.keySet();
+		// "map.keySet()" <b>DOESN'T</b> fetch all of them as {@link #readAllKeySet()} does.
+		return map.readAllKeySet();
 	}
 
 	@Override
 	public Collection<V> values() {
-		return map.values();
+		// "map.values()" <b>DOESN'T</b> fetch all of them as {@link #readAllValues()} does.
+		return map.readAllValues();
 	}
 
 	@Override
 	public Set<Entry<K, V>> entrySet() {
-		return map.entrySet();
+		// "map.entrySet()" <b>DOESN'T</b> fetch all of them as {@link #readAllEntrySet()} does.
+		return map.readAllEntrySet();
 	}
 }
