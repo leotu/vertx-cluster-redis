@@ -3,6 +3,7 @@ package io.vertx.spi.cluster.redis.impl;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
+import java.util.Map;
 import java.util.Objects;
 
 import org.redisson.api.RedissonClient;
@@ -13,29 +14,25 @@ import io.vertx.core.Vertx;
 import io.vertx.core.eventbus.impl.clustered.ClusteredEventBus;
 import io.vertx.core.impl.HAManager;
 import io.vertx.core.impl.VertxInternal;
+import io.vertx.core.json.JsonObject;
 
 /**
  * Non Public API Utility
  * 
  * @author Leo Tu - leo.tu.taipei@gmail.com
  */
-public class NonPublicSupportAPI {
-	@SuppressWarnings("unused")
-	private static final Logger log = LoggerFactory.getLogger(NonPublicSupportAPI.class);
+public class NonPublicAPI {
+	private static final Logger log = LoggerFactory.getLogger(NonPublicAPI.class);
 
 	public static final String HA_CLUSTER_MAP_NAME;
 
 	public static final String EB_SERVER_ID_HA_KEY;
 	public static final String EB_SUBS_MAP_NAME;
+
 	static {
 		HA_CLUSTER_MAP_NAME = getStaticFinalField(HAManager.class, "CLUSTER_MAP_NAME");
-		// log.debug("HA_CLUSTER_MAP_NAME={}", HA_CLUSTER_MAP_NAME);
-
 		EB_SERVER_ID_HA_KEY = getStaticFinalField(ClusteredEventBus.class, "SERVER_ID_HA_KEY");
-		// log.debug("EB_SERVER_ID_HA_KEY={}", EB_SERVER_ID_HA_KEY);
-
 		EB_SUBS_MAP_NAME = getStaticFinalField(ClusteredEventBus.class, "SUBS_MAP_NAME");
-		// log.debug("EB_SUBS_MAP_NAME={}", EB_SUBS_MAP_NAME);
 	}
 
 	public static boolean isInactive(Vertx vertx, RedissonClient redisson) {
@@ -69,27 +66,31 @@ public class NonPublicSupportAPI {
 	// return true;
 	// }
 
-	// /**
-	// * @see HAManager#addHaInfoIfLost
-	// */
-	// public static boolean addHaInfoIfLost(Vertx vertx, String nodeID) {
-	// final HAManager haManager = getHAManager(vertx);
-	// if (haManager == null) {
-	// return false;
-	// }
-	// // callMethod(haManager, HAManager.class, "addHaInfoIfLost", new Class<?>[0], new Object[0]);
-	// final JsonObject haInfo = getHaInfo(vertx);
-	// final Map<String, String> clusterMap = getFinalField(haManager, HAManager.class, "clusterMap");
-	// clusterMap.put(nodeID, haInfo.encode());
-	// return true;
-	// }
+	/**
+	 * @see HAManager#addHaInfoIfLost
+	 */
+	public static boolean addHaInfoIfLost(Vertx vertx, String nodeID) {
+		final HAManager haManager = getHAManager(vertx);
+		if (haManager == null) {
+			return false;
+		}
+		final JsonObject haInfo = getHaInfo(vertx);
+		final Map<String, String> clusterMap = getFinalField(haManager, HAManager.class, "clusterMap");
+		clusterMap.put(nodeID, haInfo.encode());
+		return true;
+	}
 
 	private static HAManager getHAManager(Vertx vertx) {
 		final ClusteredEventBus eventBus = (ClusteredEventBus) vertx.eventBus();
 		if (eventBus == null) {
+			log.debug("(eventBus == null)");
 			return null;
 		}
-		return getFinalField(eventBus, ClusteredEventBus.class, "haManager");
+		HAManager haManager = getFinalField(eventBus, ClusteredEventBus.class, "haManager");
+		if (haManager == null) {
+			log.debug("(haManager == null)");
+		}
+		return haManager;
 	}
 
 	// private Set<String> getOwnSubs(Vertx vertx) {
@@ -122,17 +123,14 @@ public class NonPublicSupportAPI {
 	// }
 	// return getField(eventBus, ClusteredEventBus.class, "nodeInfo");
 	// }
-	//
-	// public static JsonObject getHaInfo(Vertx vertx) {
-	// final HAManager haManager = getHAManager(vertx);
-	// if (haManager == null) {
-	// log.debug("(haManager == null)");
-	// return null;
-	// }
-	// final JsonObject haInfo = getFinalField(haManager, HAManager.class, "haInfo");
-	// // log.debug("haInfo={}", haInfo);
-	// return haInfo;
-	// }
+
+	public static JsonObject getHaInfo(Vertx vertx) {
+		final HAManager haManager = getHAManager(vertx);
+		if (haManager == null) {
+			return null;
+		}
+		return getFinalField(haManager, HAManager.class, "haInfo");
+	}
 
 	private static <T> T getStaticFinalField(Class<?> clsObj, String staticFieldName) {
 		return getFinalField(null, clsObj, staticFieldName);

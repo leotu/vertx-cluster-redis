@@ -30,7 +30,11 @@ public class RedisMapHaInfo extends RedisMap<String, String> {
 		super(vertx, redisson.getMapCache(name));
 		this.clusterManager = clusterManager;
 		this.mapAsync = (RMapCache<String, String>) map;
-		this.ttlMonitor = new RedisMapHaInfoTTLMonitor(vertx, this.clusterManager, redisson, this, this.mapAsync);
+		this.ttlMonitor = new RedisMapHaInfoTTLMonitor(vertx, this.clusterManager, redisson, this);
+	}
+
+	protected RMapCache<String, String> getMapAsync() {
+		return mapAsync;
 	}
 
 	protected int getTimeToLiveSeconds() {

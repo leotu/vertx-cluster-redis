@@ -27,7 +27,7 @@ import io.vertx.core.shareddata.Lock;
 import io.vertx.core.spi.cluster.AsyncMultiMap;
 import io.vertx.core.spi.cluster.ClusterManager;
 import io.vertx.core.spi.cluster.NodeListener;
-import io.vertx.spi.cluster.redis.impl.NonPublicSupportAPI;
+import io.vertx.spi.cluster.redis.impl.NonPublicAPI;
 import io.vertx.spi.cluster.redis.impl.RedisAsyncMap;
 import io.vertx.spi.cluster.redis.impl.RedisAsyncMultiMap;
 import io.vertx.spi.cluster.redis.impl.RedisAsyncMultiMapSubs;
@@ -55,8 +55,8 @@ public class RedisClusterManager implements ClusterManager {
 	private RedisMapHaInfo haInfo;
 	private RedisAsyncMultiMapSubs subs;
 
-	public static final String CLUSTER_MAP_NAME = NonPublicSupportAPI.HA_CLUSTER_MAP_NAME;
-	public static final String SUBS_MAP_NAME = NonPublicSupportAPI.EB_SUBS_MAP_NAME;
+	public static final String CLUSTER_MAP_NAME = NonPublicAPI.HA_CLUSTER_MAP_NAME;
+	public static final String SUBS_MAP_NAME = NonPublicAPI.EB_SUBS_MAP_NAME;
 
 	public RedisClusterManager(RedissonClient redisson, String nodeID) {
 		Objects.requireNonNull(redisson, "redisson");
@@ -241,7 +241,7 @@ public class RedisClusterManager implements ClusterManager {
 
 	public boolean isInactive() {
 		;
-		return !isActive() || NonPublicSupportAPI.isInactive(vertx, redisson);
+		return !isActive() || NonPublicAPI.isInactive(vertx, redisson);
 	}
 
 	/**
