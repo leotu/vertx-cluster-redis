@@ -35,10 +35,8 @@ import io.vertx.spi.cluster.redis.impl.RedisMap;
 import io.vertx.spi.cluster.redis.impl.RedisMapHaInfo;
 
 /**
- * https://github.com/redisson/redisson/wiki/7.-%E5%88%86%E5%B8%83%E5%BC%8F%E9%9B%86%E5%90%88#72-%E5%A4%9A%E5%80%BC%E6%98%A0%E5%B0%84multimap
  * 
  * @see io.vertx.core.impl.VertxFactoryImpl#clusteredVertx
- * 
  * @author Leo Tu - leo.tu.taipei@gmail.com
  */
 public class RedisClusterManager implements ClusterManager {

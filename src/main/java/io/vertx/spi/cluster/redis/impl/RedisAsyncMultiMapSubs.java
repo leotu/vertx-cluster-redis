@@ -25,10 +25,8 @@ import io.vertx.spi.cluster.redis.RedisClusterManager;
  * List node will keep it's subs address. (Don't remove last node subs, "__vertx.subs" are not empty !)
  * 
  * 
- * @see io.vertx.core.eventbus.impl.clustered.ClusterNodeInfo
  * @see io.vertx.core.net.impl.ServerID
  * @see org.redisson.codec.JsonJacksonCodec
- * 
  * @author Leo Tu - leo.tu.taipei@gmail.com
  */
 public class RedisAsyncMultiMapSubs extends RedisAsyncMultiMap<String, ClusterNodeInfo> {

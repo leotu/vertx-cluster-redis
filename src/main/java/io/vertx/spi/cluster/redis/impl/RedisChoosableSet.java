@@ -38,7 +38,7 @@ class RedisChoosableSet<T> implements ChoosableIterable<T>, Serializable {
 	private final AtomicReference<T> current;
 
 	public RedisChoosableSet(int initialSize, AtomicReference<T> current) {
-		ids = new ConcurrentHashSet<>(initialSize);
+		this.ids = new ConcurrentHashSet<>(initialSize);
 		this.current = current;
 	}
 

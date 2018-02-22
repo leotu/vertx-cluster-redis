@@ -14,7 +14,6 @@ import java.util.function.Predicate;
 import org.redisson.api.RBatch;
 import org.redisson.api.RSetMultimap;
 import org.redisson.api.RedissonClient;
-import org.redisson.client.codec.Codec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,10 +26,9 @@ import io.vertx.core.spi.cluster.AsyncMultiMap;
 import io.vertx.core.spi.cluster.ChoosableIterable;
 
 /**
+ * batch.atomic return's value must using Codec to Object. (always return String type)
  * 
- * @see org.redisson.codec.JsonJacksonCodec
  * @see org.redisson.RedissonSetMultimapValues
- * 
  * @author Leo Tu - leo.tu.taipei@gmail.com
  */
 public class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
@@ -41,16 +39,16 @@ public class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 	protected ConcurrentMap<K, AtomicReference<V>> choosableSetPtr = new ConcurrentHashMap<>();
 	protected final RedissonClient redisson;
 	protected final RSetMultimap<K, V> mmap;
-	protected final Codec codec;
-	protected final String name;
+	// protected final Codec codec;
+	// protected final String name;
 
 	public RedisAsyncMultiMap(Vertx vertx, RedissonClient redisson, String name) {
 		Objects.requireNonNull(redisson, "redisson");
 		Objects.requireNonNull(name, "name");
 		this.redisson = redisson;
-		this.name = name;
+		// this.name = name;
 		this.mmap = redisson.getSetMultimap(name);
-		this.codec = mmap.getCodec();
+		// this.codec = mmap.getCodec();
 	}
 
 	// public RedisAsyncMultiMap(Vertx vertx, RedissonClient redisson, String name, RSetMultimap<K, V> mmap) {
@@ -184,11 +182,6 @@ public class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 		});
 	}
 
-	// @SuppressWarnings("unchecked")
-	// protected V mapValueDecoded(Codec codec, String value) {
-	// return (V) value;
-	// }
-
 	private AtomicReference<V> getCurrentPointer(K k) {
 		AtomicReference<V> current = choosableSetPtr.get(k);
 		if (current == null) {
@@ -200,4 +193,10 @@ public class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 		}
 		return current;
 	}
+
+	// @SuppressWarnings("unchecked")
+	// protected V mapValueDecoded(Codec codec, String value) {
+	// return (V) value;
+	// }
+
 }

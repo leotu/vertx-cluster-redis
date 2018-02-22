@@ -20,8 +20,7 @@ import io.vertx.core.Vertx;
 import io.vertx.core.shareddata.AsyncMap;
 
 /**
- * 
- * @see org.redisson.codec.JsonJacksonCodec
+ *
  * @author Leo Tu - leo.tu.taipei@gmail.com
  */
 public class RedisAsyncMap<K, V> implements AsyncMap<K, V> {

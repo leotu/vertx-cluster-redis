@@ -12,7 +12,7 @@ import org.redisson.api.RedissonClient;
 import io.vertx.core.Vertx;
 
 /**
- * @see org.redisson.codec.JsonJacksonCodec
+ *
  * @author Leo Tu - leo.tu.taipei@gmail.com
  */
 public class RedisMap<K, V> implements Map<K, V> {
