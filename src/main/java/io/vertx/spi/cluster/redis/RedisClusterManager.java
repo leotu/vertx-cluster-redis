@@ -42,6 +42,8 @@ import io.vertx.spi.cluster.redis.impl.RedisMapHaInfo;
 public class RedisClusterManager implements ClusterManager {
 	private static final Logger log = LoggerFactory.getLogger(RedisClusterManager.class);
 
+	// private int lockTimeoutInSeconds = 15;
+
 	private Vertx vertx;
 	private final RedissonClient redisson;
 	private final boolean customClient;
@@ -66,7 +68,7 @@ public class RedisClusterManager implements ClusterManager {
 
 	public RedisClusterManager(JsonObject config) {
 		Objects.requireNonNull(config, "config");
-		log.debug("config={}", config);
+		// log.debug("config={}", config);
 
 		String redisHost = config.getString("redisHost");
 		Integer redisPort = config.getInteger("redisPort");
@@ -133,7 +135,7 @@ public class RedisClusterManager implements ClusterManager {
 			lock.tryLockAsync(timeout, TimeUnit.MILLISECONDS).whenComplete((v, e) -> resultHandler
 					.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(new RedisLock(lock))));
 		} catch (Exception e) {
-			log.warn("nodeID=" + nodeID + ", name=" + name + ", timeout=" + timeout, e);
+			log.warn("nodeID: " + nodeID + ", name: " + name + ", timeout: " + timeout, e);
 			resultHandler.handle(Future.failedFuture(e));
 		}
 	}
@@ -144,7 +146,7 @@ public class RedisClusterManager implements ClusterManager {
 			RAtomicLong counter = redisson.getAtomicLong(name);
 			resultHandler.handle(Future.succeededFuture(new RedisCounter(counter)));
 		} catch (Exception e) {
-			log.error("nodeID=" + nodeID + ", name=" + name, e);
+			log.error("nodeID: " + nodeID + ", name: " + name, e);
 			resultHandler.handle(Future.failedFuture(e));
 		}
 	}
@@ -164,25 +166,32 @@ public class RedisClusterManager implements ClusterManager {
 
 	/**
 	 * (4)
+	 * 
+	 * @see io.vertx.core.impl.HAManager#nodeAdded
+	 * @see io.vertx.core.impl.HAManager#nodeLeft
 	 */
 	@Override
 	public void nodeListener(NodeListener nodeListener) {
 		this.nodeListener = new NodeListener() {
 			@Override
 			synchronized public void nodeAdded(String nodeID) {
-				if (nodeListener != null && !isInactive()) {
+				if (!isInactive()) {
 					nodeListener.nodeAdded(nodeID);
+					// AsyncLocalLock.executeBlocking(vertx, nodeID, lockTimeoutInSeconds, () ->
+					// nodeListener.nodeAdded(nodeID));
 				} else {
-					log.warn("skip call nodeAdded(...)");
+					log.warn("Inactive, skip execute nodeAdded({})", nodeID);
 				}
 			}
 
 			@Override
 			synchronized public void nodeLeft(String nodeID) {
-				if (nodeListener != null && !isInactive()) {
+				if (!isInactive()) {
 					nodeListener.nodeLeft(nodeID);
+					// AsyncLocalLock.executeBlocking(vertx, nodeID, lockTimeoutInSeconds,
+					// () -> nodeListener.nodeLeft(nodeID));
 				} else {
-					log.warn("skip call nodeLeft(...)");
+					log.warn("Inactive, skip execute nodeLeft({})", nodeID);
 				}
 			}
 		};
@@ -194,10 +203,9 @@ public class RedisClusterManager implements ClusterManager {
 	 */
 	@Override
 	public void join(Handler<AsyncResult<Void>> resultHandler) {
-		// log.debug("^^^^^^^^^^^^^^^^^^^^^^^ nodeID={}", nodeID);
 		vertx.executeBlocking(future -> {
 			if (active) {
-				future.fail(new Exception("already active"));
+				future.fail(new Exception("already activated"));
 			} else {
 				active = true;
 				future.complete();
@@ -210,7 +218,6 @@ public class RedisClusterManager implements ClusterManager {
 	 */
 	@Override
 	public void leave(Handler<AsyncResult<Void>> resultHandler) {
-		// log.debug("^^^^^^^^^^^^^^^^^^^^^^^ nodeID={}", nodeID);
 		vertx.executeBlocking(future -> {
 			synchronized (RedisClusterManager.this) {
 				if (!active) {
@@ -238,8 +245,7 @@ public class RedisClusterManager implements ClusterManager {
 	}
 
 	public boolean isInactive() {
-		;
-		return !isActive() || NonPublicAPI.isInactive(vertx, redisson);
+		return nodeListener == null || !isActive() || NonPublicAPI.isInactive(vertx, redisson);
 	}
 
 	/**

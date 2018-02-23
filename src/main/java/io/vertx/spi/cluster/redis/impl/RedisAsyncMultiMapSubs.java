@@ -22,7 +22,8 @@ import io.vertx.spi.cluster.redis.RedisClusterManager;
 /**
  * SUBS_MAP_NAME = "__vertx.subs"
  * <p/>
- * List node will keep it's subs address. (Don't remove last node subs, "__vertx.subs" are not empty !)
+ * When last node disconnected will still keep it's subs address. (Don't remove last node subs, "__vertx.subs" are not
+ * empty !)
  * 
  * 
  * @see io.vertx.core.net.impl.ServerID
@@ -31,6 +32,8 @@ import io.vertx.spi.cluster.redis.RedisClusterManager;
  */
 public class RedisAsyncMultiMapSubs extends RedisAsyncMultiMap<String, ClusterNodeInfo> {
 	private static final Logger log = LoggerFactory.getLogger(RedisAsyncMultiMapSubs.class);
+
+	static private boolean debug = false;
 
 	public RedisAsyncMultiMapSubs(Vertx vertx, RedisClusterManager clusterManager, RedissonClient redisson,
 			String name) {
@@ -74,9 +77,13 @@ public class RedisAsyncMultiMapSubs extends RedisAsyncMultiMap<String, ClusterNo
 			ClusterNodeInfo value = entry.getValue();
 			if (p.test(value)) { // XXX: "!members.contains(ci.nodeId)"
 				deletedList.add(entry);
-				log.debug("add remove key={}, value.class={}, value={}", key, value.getClass().getName(), value);
+				if (debug) {
+					log.debug("add remove key={}, value.class={}, value={}", key, value.getClass().getName(), value);
+				}
 			} else {
-				log.debug("skip remove key={} value.class={}, value={}", key, value.getClass().getName(), value);
+				if (debug) {
+					log.debug("skip remove key={} value.class={}, value={}", key, value.getClass().getName(), value);
+				}
 			}
 		});
 
@@ -88,7 +95,7 @@ public class RedisAsyncMultiMapSubs extends RedisAsyncMultiMap<String, ClusterNo
 
 			batch.atomic().skipResult().executeAsync().whenCompleteAsync((result, e) -> {
 				if (e != null) {
-					log.warn("error={}", e.toString());
+					log.warn("error: {}", e.toString());
 					completionHandler.handle(Future.failedFuture(e));
 				} else { // XXX: skipResult() ==> result.class=<null>, result=null
 					completionHandler.handle(Future.succeededFuture());

@@ -2,19 +2,29 @@ package io.vertx.spi.cluster.redis.impl;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.function.Consumer;
 
 import org.redisson.api.RedissonClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.vertx.core.AsyncResult;
+import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
+import io.vertx.core.eventbus.impl.clustered.ClusterNodeInfo;
 import io.vertx.core.eventbus.impl.clustered.ClusteredEventBus;
 import io.vertx.core.impl.HAManager;
 import io.vertx.core.impl.VertxInternal;
 import io.vertx.core.json.JsonObject;
+import io.vertx.core.shareddata.Lock;
+import io.vertx.core.shareddata.impl.AsynchronousLock;
 
 /**
  * Non Public API Utility
@@ -25,14 +35,20 @@ public class NonPublicAPI {
 	private static final Logger log = LoggerFactory.getLogger(NonPublicAPI.class);
 
 	public static final String HA_CLUSTER_MAP_NAME;
-
 	public static final String EB_SERVER_ID_HA_KEY;
 	public static final String EB_SUBS_MAP_NAME;
 
 	static {
-		HA_CLUSTER_MAP_NAME = getStaticFinalField(HAManager.class, "CLUSTER_MAP_NAME");
-		EB_SERVER_ID_HA_KEY = getStaticFinalField(ClusteredEventBus.class, "SERVER_ID_HA_KEY");
-		EB_SUBS_MAP_NAME = getStaticFinalField(ClusteredEventBus.class, "SUBS_MAP_NAME");
+		HA_CLUSTER_MAP_NAME = Reflection.getStaticFinalField(HAManager.class, "CLUSTER_MAP_NAME");
+		EB_SERVER_ID_HA_KEY = Reflection.getStaticFinalField(ClusteredEventBus.class, "SERVER_ID_HA_KEY");
+		EB_SUBS_MAP_NAME = Reflection.getStaticFinalField(ClusteredEventBus.class, "SUBS_MAP_NAME");
+	}
+
+	/**
+	 * FIX: Non Vert.x thread
+	 */
+	public static void runOnContext(Vertx vertx, Handler<Void> action) {
+		vertx.getOrCreateContext().runOnContext(action);
 	}
 
 	public static boolean isInactive(Vertx vertx, RedissonClient redisson) {
@@ -41,7 +57,7 @@ public class NonPublicAPI {
 			final HAManager haManager = getHAManager(vertx);
 			final VertxInternal vertxInternal = (VertxInternal) vertx;
 			if (haManager != null) {
-				final boolean haManagerStopped = getField(haManager, HAManager.class, "stopped");
+				final boolean haManagerStopped = Reflection.getField(haManager, HAManager.class, "stopped");
 				return vertxInternal.isKilled() || redisson.isShutdown() || redisson.isShuttingDown()
 						|| haManager.isKilled() || haManagerStopped;
 			} else {
@@ -52,21 +68,9 @@ public class NonPublicAPI {
 		}
 	}
 
-	// /**
-	// * @see HAManager#addDataToAHAInfo
-	// */
-	// public static boolean addDataToAHAInfo(Vertx vertx, String nodeID) {
-	// final HAManager haManager = getHAManager(vertx);
-	// if (haManager == null) {
-	// return false;
-	// }
-	// final JsonObject haInfo = getHaInfo(vertx);
-	// final Map<String, String> clusterMap = getFinalField(haManager, HAManager.class, "clusterMap");
-	// clusterMap.put(nodeID, haInfo.encode());
-	// return true;
-	// }
-
 	/**
+	 * 
+	 * @see HAManager#addDataToAHAInfo
 	 * @see HAManager#addHaInfoIfLost
 	 */
 	public static boolean addHaInfoIfLost(Vertx vertx, String nodeID) {
@@ -75,7 +79,7 @@ public class NonPublicAPI {
 			return false;
 		}
 		final JsonObject haInfo = getHaInfo(vertx);
-		final Map<String, String> clusterMap = getFinalField(haManager, HAManager.class, "clusterMap");
+		final Map<String, String> clusterMap = Reflection.getFinalField(haManager, HAManager.class, "clusterMap");
 		clusterMap.put(nodeID, haInfo.encode());
 		return true;
 	}
@@ -86,141 +90,258 @@ public class NonPublicAPI {
 			log.debug("(eventBus == null)");
 			return null;
 		}
-		HAManager haManager = getFinalField(eventBus, ClusteredEventBus.class, "haManager");
+		HAManager haManager = Reflection.getFinalField(eventBus, ClusteredEventBus.class, "haManager");
 		if (haManager == null) {
 			log.debug("(haManager == null)");
 		}
 		return haManager;
 	}
 
-	// private Set<String> getOwnSubs(Vertx vertx) {
-	// final ClusteredEventBus eventBus = (ClusteredEventBus) vertx.eventBus();
-	// if (eventBus == null) {
-	// return null;
-	// }
-	// return getField(eventBus, ClusteredEventBus.class, "ownSubs");
-	// }
+	/**
+	 * Local ConcurrentHashSet
+	 */
+	@SuppressWarnings("unused")
+	private static Set<String> getOwnSubs(Vertx vertx) {
+		final ClusteredEventBus eventBus = (ClusteredEventBus) vertx.eventBus();
+		if (eventBus == null) {
+			return null;
+		}
+		return Reflection.getField(eventBus, ClusteredEventBus.class, "ownSubs");
+	}
 
-	// /**
-	// * @param vertx
-	// */
-	// public Map<String, ClusterNodeInfo> getOwnSubsWithClusterNodeInfo(Vertx vertx) {
-	// final ClusteredEventBus eventBus = (ClusteredEventBus) vertx.eventBus();
-	// if (eventBus == null) {
-	// return null;
-	// }
-	// ClusterNodeInfo nodeInfo = getClusterNodeInfo(vertx);
-	// Set<String> ownSubs = getOwnSubs(vertx);
-	// ConcurrentMap<String, ClusterNodeInfo> rejoinSyncAddresses = new ConcurrentHashMap<>();
-	// ownSubs.forEach(address -> rejoinSyncAddresses.put(address, nodeInfo));
-	// return rejoinSyncAddresses;
-	// }
-
-	// private ClusterNodeInfo getClusterNodeInfo(Vertx vertx) {
-	// final ClusteredEventBus eventBus = (ClusteredEventBus) vertx.eventBus();
-	// if (eventBus == null) {
-	// return null;
-	// }
-	// return getField(eventBus, ClusteredEventBus.class, "nodeInfo");
-	// }
+	@SuppressWarnings("unused")
+	private static ClusterNodeInfo getClusterNodeInfo(Vertx vertx) {
+		final ClusteredEventBus eventBus = (ClusteredEventBus) vertx.eventBus();
+		if (eventBus == null) {
+			return null;
+		}
+		return Reflection.getField(eventBus, ClusteredEventBus.class, "nodeInfo");
+	}
 
 	public static JsonObject getHaInfo(Vertx vertx) {
 		final HAManager haManager = getHAManager(vertx);
 		if (haManager == null) {
 			return null;
 		}
-		return getFinalField(haManager, HAManager.class, "haInfo");
+		return Reflection.getFinalField(haManager, HAManager.class, "haInfo");
 	}
 
-	private static <T> T getStaticFinalField(Class<?> clsObj, String staticFieldName) {
-		return getFinalField(null, clsObj, staticFieldName);
-	}
+	protected static class Reflection {
 
-	/**
-	 * 
-	 * @param reflectObj
-	 *            null for static field
-	 */
-	private static <T> T getFinalField(Object reflectObj, Class<?> clsObj, String fieldName) {
-		Objects.requireNonNull(clsObj, "clsObj");
-		Objects.requireNonNull(fieldName, "fieldName");
-		try {
-			Field field = clsObj.getDeclaredField(fieldName);
-			boolean keepStatus = field.isAccessible();
-			if (!keepStatus) {
-				field.setAccessible(true);
-			}
+		private static <T> T getStaticFinalField(Class<?> clsObj, String staticFieldName) {
+			return getFinalField(null, clsObj, staticFieldName);
+		}
+
+		/**
+		 * 
+		 * @param reflectObj
+		 *            null for static field
+		 */
+		@SuppressWarnings("unchecked")
+		private static <T> T getFinalField(Object reflectObj, Class<?> clsObj, String fieldName) {
+			Objects.requireNonNull(clsObj, "clsObj");
+			Objects.requireNonNull(fieldName, "fieldName");
 			try {
-				Field modifiersField = Field.class.getDeclaredField("modifiers");
-				modifiersField.setAccessible(true);
-				modifiersField.setInt(field, field.getModifiers() & ~Modifier.FINAL);
-				//
-				Object fieldObj = field.get(reflectObj);
-				@SuppressWarnings("unchecked")
-				T t = (T) fieldObj;
-				return t;
-			} finally {
-				field.setAccessible(keepStatus);
+				Field field = clsObj.getDeclaredField(fieldName);
+				boolean keepStatus = field.isAccessible();
+				if (!keepStatus) {
+					field.setAccessible(true);
+				}
+				try {
+					Field modifiersField = Field.class.getDeclaredField("modifiers");
+					modifiersField.setAccessible(true);
+					modifiersField.setInt(field, field.getModifiers() & ~Modifier.FINAL);
+					//
+					return (T) field.get(reflectObj);
+				} finally {
+					field.setAccessible(keepStatus);
+				}
+			} catch (Exception e) {
+				Throwable t = e.getCause() != null && e instanceof InvocationTargetException ? e.getCause() : e;
+				throw new RuntimeException(fieldName, t);
 			}
-		} catch (Exception e) {
-			Throwable t = e.getCause() != null && e instanceof InvocationTargetException ? e.getCause() : e;
-			throw new RuntimeException(fieldName, t);
+		}
+
+		/**
+		 * 
+		 * @param reflectObj
+		 *            null for static field
+		 */
+		@SuppressWarnings("unchecked")
+		private static <T> T getField(Object reflectObj, Class<?> clsObj, String fieldName) {
+			Objects.requireNonNull(clsObj, "clsObj");
+			Objects.requireNonNull(fieldName, "fieldName");
+			try {
+				Field field = clsObj.getDeclaredField(fieldName);
+				boolean keepStatus = field.isAccessible();
+				if (!keepStatus) {
+					field.setAccessible(true);
+				}
+				try {
+					return (T) field.get(reflectObj);
+				} finally {
+					field.setAccessible(keepStatus);
+				}
+			} catch (Exception e) {
+				Throwable t = e.getCause() != null && e instanceof InvocationTargetException ? e.getCause() : e;
+				throw new RuntimeException(fieldName, t);
+			}
+		}
+
+		/**
+		 *
+		 * @param reflectObj
+		 *            null for static method
+		 */
+		@SuppressWarnings({ "unchecked", "unused" })
+		static private <T> T callMethod(Object reflectObj, Class<?> clsObj, String methodName, Class<?>[] argsTypes,
+				Object[] argsValues) {
+			Objects.requireNonNull(clsObj, "clsObj");
+			Objects.requireNonNull(methodName, "methodName");
+			try {
+				Method method = clsObj.getDeclaredMethod(methodName, argsTypes);
+				boolean keepStatus = method.isAccessible();
+				if (!keepStatus) {
+					method.setAccessible(true);
+				}
+				try {
+					return (T) method.invoke(reflectObj, argsValues);
+				} finally {
+					method.setAccessible(keepStatus);
+				}
+			} catch (Exception e) {
+				Throwable t = e.getCause() != null && e instanceof InvocationTargetException ? e.getCause() : e;
+				throw new RuntimeException(methodName, t);
+			}
 		}
 	}
 
 	/**
+	 * Local Lock
 	 * 
-	 * @param reflectObj
-	 *            null for static field
+	 * @see io.vertx.core.shareddata.impl.SharedDataImpl
 	 */
-	private static <T> T getField(Object reflectObj, Class<?> clsObj, String fieldName) {
-		Objects.requireNonNull(clsObj, "clsObj");
-		Objects.requireNonNull(fieldName, "fieldName");
-		try {
-			Field field = clsObj.getDeclaredField(fieldName);
-			boolean keepStatus = field.isAccessible();
-			if (!keepStatus) {
-				field.setAccessible(true);
-			}
-			try {
-				Object fieldObj = field.get(reflectObj);
-				@SuppressWarnings("unchecked")
-				T t = (T) fieldObj;
-				return t;
-			} finally {
-				field.setAccessible(keepStatus);
-			}
-		} catch (Exception e) {
-			Throwable t = e.getCause() != null && e instanceof InvocationTargetException ? e.getCause() : e;
-			throw new RuntimeException(fieldName, t);
+	public static class AsyncLocalLock {
+		static private final ConcurrentMap<String, AsynchronousLock> localLocks = new ConcurrentHashMap<>();
+
+		/**
+		 * ignore any error
+		 */
+		static public void executeBlocking(Vertx vertx, String key, int timeoutInSeconds, Runnable executor) {
+			acquireLockWithTimeout(vertx, key, timeoutInSeconds, lock -> {
+				vertx.executeBlocking(future -> {
+					try {
+						executor.run();
+						future.complete();
+					} catch (Throwable ex) {
+						future.fail(ex);
+					}
+				}, ar -> {
+					if (ar.failed()) {
+						log.info("key: {}, error: {}", key, ar.cause().toString());
+					}
+					releaseLock(lock);
+				});
+			}, e -> {
+				log.info("key: {} ignore lock failed: {}", key, e.toString());
+				vertx.executeBlocking(future -> {
+					try {
+						executor.run();
+						future.complete();
+					} catch (Throwable ex) {
+						future.fail(ex);
+					}
+				}, ar -> {
+					if (ar.failed()) {
+						log.info("key: {}, ignore error: {}", key, ar.cause().toString());
+					}
+				});
+			});
+		}
+
+		static public void executeBlocking(Vertx vertx, String key, int timeoutInSeconds, Runnable executor,
+				Consumer<Throwable> error) {
+			acquireLockWithTimeout(vertx, key, timeoutInSeconds, lock -> {
+				vertx.executeBlocking(future -> {
+					try {
+						executor.run();
+						future.complete();
+					} catch (Throwable ex) {
+						future.fail(ex);
+					}
+				}, ar -> {
+					try {
+						error.accept(ar.cause());
+					} finally {
+						releaseLock(lock);
+					}
+				});
+			}, e -> error.accept(e));
+		}
+
+		/**
+		 * ignore any error
+		 */
+		static public void execute(Vertx vertx, String key, int timeoutInSeconds, Runnable executor) {
+			acquireLockWithTimeout(vertx, key, timeoutInSeconds, lock -> {
+				try {
+					executor.run();
+				} catch (Throwable ex) {
+					log.info("key: {}, ignore error: {}", key, ex.toString());
+				} finally {
+					releaseLock(lock);
+				}
+			}, e -> {
+				log.info("key: {} ignore lock failed: {}", key, e.toString());
+				try {
+					executor.run();
+				} catch (Throwable ex) {
+					log.info("key: {}, ignore error: {}", key, ex.toString());
+				}
+			});
+		}
+
+		static public void execute(Vertx vertx, String key, int timeoutInSeconds, Runnable executor,
+				Consumer<Throwable> error) {
+			acquireLockWithTimeout(vertx, key, timeoutInSeconds, lock -> {
+				try {
+					executor.run();
+				} catch (Throwable ex) {
+					error.accept(ex);
+				} finally {
+					releaseLock(lock);
+				}
+			}, e -> error.accept(e));
+		}
+
+		/**
+		 * @see io.vertx.core.shareddata.impl.SharedDataImpl#getLockWithTimeout
+		 */
+		static private void acquireLockWithTimeout(Vertx vertx, String key, int timeoutInSeconds,
+				Handler<io.vertx.core.shareddata.Lock> resultHandler, Handler<Throwable> errorHandler) {
+			getLockWithTimeout(vertx, key, timeoutInSeconds * 1000, ar -> {
+				if (ar.failed()) {
+					errorHandler.handle(ar.cause());
+				} else {
+					resultHandler.handle(ar.result());
+				}
+			});
+		}
+
+		/**
+		 * @see io.vertx.core.shareddata.impl.AsynchronousLock#release
+		 */
+		static private void releaseLock(io.vertx.core.shareddata.Lock lock) {
+			lock.release();
+		}
+
+		/**
+		 * @see io.vertx.core.shareddata.impl.SharedDataImpl#getLocalLock
+		 */
+		static private void getLockWithTimeout(Vertx vertx, String key, int timeoutInSeconds,
+				Handler<AsyncResult<Lock>> resultHandler) {
+			AsynchronousLock lock = localLocks.computeIfAbsent(key, n -> new AsynchronousLock(vertx));
+			lock.acquire(timeoutInSeconds * 1000, resultHandler);
 		}
 	}
-
-	// /**
-	// *
-	// * @param reflectObj
-	// * null for static method
-	// */
-	// static public <T> T callMethod(Object reflectObj, Class<?> clsObj, String methodName, Class<?>[] argsTypes,
-	// Object[] argsValues) {
-	// Objects.requireNonNull(clsObj, "clsObj");
-	// Objects.requireNonNull(methodName, "methodName");
-	// try {
-	// Method method = clsObj.getDeclaredMethod(methodName, argsTypes);
-	// boolean keepStatus = method.isAccessible();
-	// if (!keepStatus) {
-	// method.setAccessible(true);
-	// }
-	// try {
-	// @SuppressWarnings("unchecked")
-	// T obj = (T) method.invoke(reflectObj, argsValues);
-	// return obj;
-	// } finally {
-	// method.setAccessible(keepStatus);
-	// }
-	// } catch (Exception e) {
-	// Throwable t = e.getCause() != null && e instanceof InvocationTargetException ? e.getCause() : e;
-	// throw new RuntimeException(methodName, t);
-	// }
-	// }
 }

@@ -62,7 +62,8 @@ public class RedisMapHaInfo extends RedisMap<String, String> {
 			return mapAsync.put(key, value, timeToLiveSeconds, TimeUnit.SECONDS);
 		} catch (Exception e) {
 			String previous = super.put(key, value);
-			log.warn("retry: key={}, value={}, previous={} when error={}", key, value, previous, e.toString());
+			log.warn("retry without TTL: key: {}, value: {}, previous: {}, timeToLiveSeconds: {}, error: {}", key,
+					value, previous, timeToLiveSeconds, e.toString());
 			return previous;
 		}
 	}

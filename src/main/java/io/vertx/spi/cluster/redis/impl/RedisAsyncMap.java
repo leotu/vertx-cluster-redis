@@ -37,42 +37,20 @@ public class RedisAsyncMap<K, V> implements AsyncMap<K, V> {
 		this.map = redisson.getMapCache(name);
 	}
 
-	// /**
-	// * FIX: Non Vert.x thread
-	// *
-	// * <pre>
-	// * Thread[redisson-netty-1-6,5,main]
-	// * Thread[vert.x-eventloop-thread-1,5,main]
-	// * </pre>
-	// */
-	// protected void runOnContext(Handler<Void> action) {
-	// vertx.getOrCreateContext().runOnContext(action);
-	// }
-
 	@Override
 	public void get(K k, Handler<AsyncResult<V>> resultHandler) {
 		map.getAsync(k).whenComplete(
 				(v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
-
-		// map.getAsync(k).whenComplete((v, e) -> runOnContext(
-		// (vd) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v))));
 	}
 
 	@Override
 	public void put(K k, V v, Handler<AsyncResult<Void>> completionHandler) {
-		// map.putAsync(k, v).whenComplete(
-		// (previousValue, e) -> completionHandler.handle(e != null ? Future.failedFuture(e) :
-		// Future.succeededFuture()));
-
 		map.fastPutAsync(k, v).whenComplete(
 				(added, e) -> completionHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture()));
 	}
 
 	@Override
 	public void put(K k, V v, long ttl, Handler<AsyncResult<Void>> completionHandler) {
-		// map.putAsync(k, v, ttl, TimeUnit.MILLISECONDS).whenComplete((previousValue, e) -> completionHandler
-		// .handle(e != null ? Future.failedFuture(e) : Future.succeededFuture()));
-
 		map.fastPutAsync(k, v, ttl, TimeUnit.MILLISECONDS).whenComplete(
 				(added, e) -> completionHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture()));
 	}

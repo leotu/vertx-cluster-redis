@@ -39,26 +39,13 @@ public class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 	protected ConcurrentMap<K, AtomicReference<V>> choosableSetPtr = new ConcurrentHashMap<>();
 	protected final RedissonClient redisson;
 	protected final RSetMultimap<K, V> mmap;
-	// protected final Codec codec;
-	// protected final String name;
 
 	public RedisAsyncMultiMap(Vertx vertx, RedissonClient redisson, String name) {
 		Objects.requireNonNull(redisson, "redisson");
 		Objects.requireNonNull(name, "name");
 		this.redisson = redisson;
-		// this.name = name;
 		this.mmap = redisson.getSetMultimap(name);
-		// this.codec = mmap.getCodec();
 	}
-
-	// public RedisAsyncMultiMap(Vertx vertx, RedissonClient redisson, String name, RSetMultimap<K, V> mmap) {
-	// Objects.requireNonNull(redisson, "redisson");
-	// Objects.requireNonNull(mmap, "mmap");
-	// this.redisson = redisson;
-	// this.name = name;
-	// this.mmap = mmap;
-	// this.codec = mmap.getCodec();
-	// }
 
 	@Override
 	public void add(K k, V v, Handler<AsyncResult<Void>> completionHandler) {
@@ -99,7 +86,7 @@ public class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 	public void removeAllMatching(Predicate<V> p, Handler<AsyncResult<Void>> completionHandler) {
 		mmap.readAllKeySetAsync().whenComplete((keys, e) -> {
 			if (e != null) {
-				log.warn("error={}", e.toString());
+				log.warn("error: {}", e.toString());
 				completionHandler.handle(Future.failedFuture(e));
 			} else {
 				if (keys.isEmpty()) {
@@ -164,7 +151,7 @@ public class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 									});
 									batch.atomic().skipResult().executeAsync().whenCompleteAsync((result, e3) -> {
 										if (e != null) {
-											log.warn("key={}, error={}", key, e3.toString());
+											log.warn("key: {}, error: {}", key, e3.toString());
 											keyFuture.fail(e3);
 										} else { // XXX: skipResult() ==> result.class=<null>, result=null
 											keyFuture.complete();
@@ -193,10 +180,5 @@ public class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 		}
 		return current;
 	}
-
-	// @SuppressWarnings("unchecked")
-	// protected V mapValueDecoded(Codec codec, String value) {
-	// return (V) value;
-	// }
 
 }
