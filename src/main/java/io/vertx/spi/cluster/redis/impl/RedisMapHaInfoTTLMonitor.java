@@ -1,3 +1,18 @@
+/*
+ * Copyright (c) 2018 The original author or authors
+ * ------------------------------------------------------
+ * All rights reserved. This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License v1.0
+ * and Apache License v2.0 which accompanies this distribution.
+ *
+ *     The Eclipse Public License is available at
+ *     http://www.eclipse.org/legal/epl-v10.html
+ *
+ *     The Apache License v2.0 is available at
+ *     http://www.opensource.org/licenses/apache2.0.php
+ *
+ * You may elect to redistribute this code under either of these licenses.
+ */
 package io.vertx.spi.cluster.redis.impl;
 
 import java.time.LocalDateTime;
@@ -39,10 +54,7 @@ public class RedisMapHaInfoTTLMonitor {
 	static private boolean debug = false;
 
 	private int refreshIntervalSeconds = 5;
-
-	// <nodeId, Timer ID>
-	private final ConcurrentMap<String, Long> resetTTL = new ConcurrentHashMap<>();
-
+	private final ConcurrentMap<String, Long> resetTTL = new ConcurrentHashMap<>();// <nodeId, Timer ID>
 	private final Vertx vertx;
 	private final RedisClusterManager clusterManager;
 	private final RedisMapHaInfo redisMapHaInfo;
@@ -78,12 +90,12 @@ public class RedisMapHaInfoTTLMonitor {
 		this.removedListeneId = mapAsync.addListener(new EntryRemovedListener<String, String>() {
 			@Override
 			public void onRemoved(EntryEvent<String, String> event) {
-				String nodeID = event.getKey();
+				String nodeId = event.getKey();
 				if (debug) {
-					log.debug("********** removed(nodeLeft): nodeID={}, clusterManager.nodeID={}", nodeID,
+					log.debug("********** removed(nodeLeft): nodeId={}, clusterManager.nodeId={}", nodeId,
 							clusterManager.getNodeID());
 				}
-				nodeListener.nodeLeft(nodeID);
+				nodeListener.nodeLeft(nodeId);
 			}
 		});
 
@@ -91,12 +103,12 @@ public class RedisMapHaInfoTTLMonitor {
 		this.expiredListenerId = mapAsync.addListener(new EntryExpiredListener<String, String>() {
 			@Override
 			public void onExpired(EntryEvent<String, String> event) {
-				String nodeID = event.getKey();
+				String nodeId = event.getKey();
 				if (debug) {
-					log.debug("********** expired(nodeLeft): nodeID={}, clusterManager.nodeID={}", nodeID,
+					log.debug("********** expired(nodeLeft): nodeId={}, clusterManager.nodeId={}", nodeId,
 							clusterManager.getNodeID());
 				}
-				nodeListener.nodeLeft(nodeID);
+				nodeListener.nodeLeft(nodeId);
 			}
 		});
 
@@ -108,12 +120,12 @@ public class RedisMapHaInfoTTLMonitor {
 
 			@Override
 			public void onCreated(EntryEvent<String, String> event) {
-				String nodeID = event.getKey();
+				String nodeId = event.getKey();
 				if (debug) {
-					log.debug("********** created(nodeAdded): nodeID={}, clusterManager.nodeID={}", nodeID,
+					log.debug("********** created(nodeAdded): nodeId={}, clusterManager.nodeId={}", nodeId,
 							clusterManager.getNodeID());
 				}
-				nodeListener.nodeAdded(nodeID);
+				nodeListener.nodeAdded(nodeId);
 			}
 		});
 
@@ -122,12 +134,12 @@ public class RedisMapHaInfoTTLMonitor {
 			@Override
 			public void onUpdated(EntryEvent<String, String> event) {
 				if (clusterManager.getNodeID().equals(event.getKey())) { // only work on self's node
-					String nodeID = event.getKey();
+					String nodeId = event.getKey();
 					if (debug) {
-						log.debug("********** onUpdated(clusterNodeAttached): nodeID={}, clusterManager.nodeID={}",
-								nodeID, clusterManager.getNodeID());
+						log.debug("********** onUpdated(clusterNodeAttached): nodeId={}, clusterManager.nodeId={}", nodeId,
+								clusterManager.getNodeID());
 					}
-					clusterNodeAttached(nodeID, event.getValue());
+					clusterNodeAttached(nodeId, event.getValue());
 				}
 			}
 		});
@@ -148,8 +160,8 @@ public class RedisMapHaInfoTTLMonitor {
 			if (nodes.size() == 1 && nodes.get(0).equals(clusterManager.getNodeID())) {
 				EntryEvent<String, String> event = new EntryEvent<>(mapAsync, Type.CREATED, nodeId, value, value);
 				if (debug) {
-					log.debug("********** nodeCreatedNofity.onCreated, nodeId={}, serverID={}, value={}", nodeId,
-							serverID, value);
+					log.debug("********** nodeCreatedNofity.onCreated, nodeId={}, serverID={}, value={}", nodeId, serverID,
+							value);
 				}
 				nodeCreatedNofity.onCreated(event);
 			}
@@ -217,6 +229,7 @@ public class RedisMapHaInfoTTLMonitor {
 	 * <p/>
 	 * get --> put
 	 */
+	@Deprecated
 	@SuppressWarnings("unused")
 	private void refreshAction_(String nodeId) {
 		mapAsync.getAsync(nodeId).whenComplete((v, e) -> {
@@ -232,9 +245,8 @@ public class RedisMapHaInfoTTLMonitor {
 							.whenComplete((newOne, e2) -> {
 								if (e2 == null) {
 									if (newOne) {
-										log.warn(
-												"newOne(addHaInfoIfLost): {}, nodeId: {}, value: {}, previous value: {}",
-												newOne, nodeId, v);
+										log.warn("newOne(addHaInfoIfLost): {}, nodeId: {}, value: {}, previous value: {}", newOne, nodeId,
+												v);
 									}
 								} else {
 									log.warn("nodeId: {}, error: {}", nodeId, e2.toString());
@@ -263,20 +275,20 @@ public class RedisMapHaInfoTTLMonitor {
 	 * NonPublicSupportAPI.addHaInfoIfLost(...) will fire EntryCreatedListener(...)
 	 */
 	private void checkRejoin(Date faultTime, String haInfo) {
-		String nodeID = clusterManager.getNodeID();
+		String nodeId = clusterManager.getNodeID();
 		if (clusterManager.isInactive()) {
 			if (debug) {
-				log.warn("inactive nodeID={}, haInfo={}, faultTime={}", nodeID, haInfo, faultTime);
+				log.warn("inactive nodeId={}, haInfo={}, faultTime={}", nodeId, haInfo, faultTime);
 			}
 			return;
 		}
 		if (haInfo == null) { // rejoin
 			if (debug) {
-				log.debug("call addHaInfoIfLost(...), nodeID={}, haInfo={}", nodeID, haInfo);
+				log.debug("call addHaInfoIfLost(...), nodeId={}, haInfo={}", nodeId, haInfo);
 			}
-			NonPublicAPI.addHaInfoIfLost(vertx, nodeID);
+			NonPublicAPI.addHaInfoIfLost(vertx, nodeId); // XXX
 		}
-		//
+
 		if (faultTime != null && haInfo != null) {
 			int timeToLiveSeconds = redisMapHaInfo.getTimeToLiveSeconds();
 			LocalDateTime now = LocalDateTime.now();
@@ -284,7 +296,7 @@ public class RedisMapHaInfoTTLMonitor {
 					.atZone(ZoneId.systemDefault()).toLocalDateTime();
 
 			if (now.isAfter(faultTimeWithTTL)) {
-				log.debug("nodeID: {}, now: {}, faultTimeWithTTL: {}, now.isAfter(faultTimeWithTTL): {}", nodeID, now,
+				log.debug("nodeId: {}, now: {}, faultTimeWithTTL: {}, now.isAfter(faultTimeWithTTL): {}", nodeId, now,
 						faultTimeWithTTL, now.isAfter(faultTimeWithTTL));
 			}
 		}

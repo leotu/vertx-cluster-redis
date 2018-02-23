@@ -260,44 +260,44 @@ public class RedisClusterManager implements ClusterManager {
 
 		@Override
 		public void get(Handler<AsyncResult<Long>> resultHandler) {
-			counter.getAsync().whenComplete(
-					(v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
+			counter.getAsync()
+					.whenComplete((v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
 		}
 
 		@Override
 		public void incrementAndGet(Handler<AsyncResult<Long>> resultHandler) {
-			counter.incrementAndGetAsync().whenComplete(
-					(v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
+			counter.incrementAndGetAsync()
+					.whenComplete((v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
 		}
 
 		@Override
 		public void getAndIncrement(Handler<AsyncResult<Long>> resultHandler) {
-			counter.getAndIncrementAsync().whenComplete(
-					(v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
+			counter.getAndIncrementAsync()
+					.whenComplete((v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
 		}
 
 		@Override
 		public void decrementAndGet(Handler<AsyncResult<Long>> resultHandler) {
-			counter.decrementAndGetAsync().whenComplete(
-					(v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
+			counter.decrementAndGetAsync()
+					.whenComplete((v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
 		}
 
 		@Override
 		public void addAndGet(long value, Handler<AsyncResult<Long>> resultHandler) {
-			counter.addAndGetAsync(value).whenComplete(
-					(v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
+			counter.addAndGetAsync(value)
+					.whenComplete((v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
 		}
 
 		@Override
 		public void getAndAdd(long value, Handler<AsyncResult<Long>> resultHandler) {
-			counter.getAndAddAsync(value).whenComplete(
-					(v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
+			counter.getAndAddAsync(value)
+					.whenComplete((v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
 		}
 
 		@Override
 		public void compareAndSet(long expected, long value, Handler<AsyncResult<Boolean>> resultHandler) {
-			counter.compareAndSetAsync(expected, value).whenComplete(
-					(v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
+			counter.compareAndSetAsync(expected, value)
+					.whenComplete((v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
 		}
 	}
 

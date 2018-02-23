@@ -1,3 +1,18 @@
+/*
+ * Copyright (c) 2018 The original author or authors
+ * ------------------------------------------------------
+ * All rights reserved. This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License v1.0
+ * and Apache License v2.0 which accompanies this distribution.
+ *
+ *     The Eclipse Public License is available at
+ *     http://www.eclipse.org/legal/epl-v10.html
+ *
+ *     The Apache License v2.0 is available at
+ *     http://www.opensource.org/licenses/apache2.0.php
+ *
+ * You may elect to redistribute this code under either of these licenses.
+ */
 package io.vertx.spi.cluster.redis.impl;
 
 import java.lang.reflect.Field;
@@ -58,8 +73,8 @@ public class NonPublicAPI {
 			final VertxInternal vertxInternal = (VertxInternal) vertx;
 			if (haManager != null) {
 				final boolean haManagerStopped = Reflection.getField(haManager, HAManager.class, "stopped");
-				return vertxInternal.isKilled() || redisson.isShutdown() || redisson.isShuttingDown()
-						|| haManager.isKilled() || haManagerStopped;
+				return vertxInternal.isKilled() || redisson.isShutdown() || redisson.isShuttingDown() || haManager.isKilled()
+						|| haManagerStopped;
 			} else {
 				return vertxInternal.isKilled() || redisson.isShutdown() || redisson.isShuttingDown();
 			}
@@ -134,8 +149,7 @@ public class NonPublicAPI {
 
 		/**
 		 * 
-		 * @param reflectObj
-		 *            null for static field
+		 * @param reflectObj null for static field
 		 */
 		@SuppressWarnings("unchecked")
 		private static <T> T getFinalField(Object reflectObj, Class<?> clsObj, String fieldName) {
@@ -164,8 +178,7 @@ public class NonPublicAPI {
 
 		/**
 		 * 
-		 * @param reflectObj
-		 *            null for static field
+		 * @param reflectObj null for static field
 		 */
 		@SuppressWarnings("unchecked")
 		private static <T> T getField(Object reflectObj, Class<?> clsObj, String fieldName) {
@@ -190,8 +203,7 @@ public class NonPublicAPI {
 
 		/**
 		 *
-		 * @param reflectObj
-		 *            null for static method
+		 * @param reflectObj null for static method
 		 */
 		@SuppressWarnings({ "unchecked", "unused" })
 		static private <T> T callMethod(Object reflectObj, Class<?> clsObj, String methodName, Class<?>[] argsTypes,

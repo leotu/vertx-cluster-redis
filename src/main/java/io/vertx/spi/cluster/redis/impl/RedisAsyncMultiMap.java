@@ -1,4 +1,18 @@
-
+/*
+ * Copyright (c) 2018 The original author or authors
+ * ------------------------------------------------------
+ * All rights reserved. This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License v1.0
+ * and Apache License v2.0 which accompanies this distribution.
+ *
+ *     The Eclipse Public License is available at
+ *     http://www.eclipse.org/legal/epl-v10.html
+ *
+ *     The Apache License v2.0 is available at
+ *     http://www.opensource.org/licenses/apache2.0.php
+ *
+ * You may elect to redistribute this code under either of these licenses.
+ */
 package io.vertx.spi.cluster.redis.impl;
 
 import java.util.ArrayList;
@@ -69,8 +83,8 @@ public class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 
 	@Override
 	public void remove(K k, V v, Handler<AsyncResult<Boolean>> completionHandler) {
-		mmap.removeAsync(k, v).whenComplete((removed, e) -> completionHandler
-				.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(removed)));
+		mmap.removeAsync(k, v).whenComplete(
+				(removed, e) -> completionHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(removed)));
 	}
 
 	@Override
@@ -131,13 +145,11 @@ public class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 									if (p.test(value)) { // XXX
 										deletedList.add(value);
 										if (debug) {
-											log.debug("add remove key={}, value.class={}, value={}", key,
-													value.getClass().getName(), value);
+											log.debug("add remove key={}, value.class={}, value={}", key, value.getClass().getName(), value);
 										}
 									} else {
 										if (debug) {
-											log.debug("skip remove key={} value.class={}, value={}", key,
-													value.getClass().getName(), value);
+											log.debug("skip remove key={} value.class={}, value={}", key, value.getClass().getName(), value);
 										}
 									}
 								});
@@ -163,8 +175,8 @@ public class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 					});
 				}
 				//
-				CompositeFuture.all(new ArrayList<>(keyFutures.values())).setHandler(ar -> completionHandler
-						.handle(ar.failed() ? Future.failedFuture(ar.cause()) : Future.succeededFuture()));
+				CompositeFuture.all(new ArrayList<>(keyFutures.values())).setHandler(
+						ar -> completionHandler.handle(ar.failed() ? Future.failedFuture(ar.cause()) : Future.succeededFuture()));
 			}
 		});
 	}

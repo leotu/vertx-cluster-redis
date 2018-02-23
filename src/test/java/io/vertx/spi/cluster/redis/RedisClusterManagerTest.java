@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2014 The original author or authors
+ * Copyright (c) 2018 The original author or authors
  * ------------------------------------------------------
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -37,6 +37,7 @@ import io.vertx.core.VertxOptions;
 import io.vertx.test.core.AsyncTestBase;
 
 /**
+ * 
  * @author Leo Tu - leo.tu.taipei@gmail.com
  */
 public class RedisClusterManagerTest extends AsyncTestBase {

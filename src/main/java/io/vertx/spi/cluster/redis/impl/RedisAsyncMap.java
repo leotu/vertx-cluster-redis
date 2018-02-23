@@ -1,4 +1,18 @@
-
+/*
+ * Copyright (c) 2018 The original author or authors
+ * ------------------------------------------------------
+ * All rights reserved. This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License v1.0
+ * and Apache License v2.0 which accompanies this distribution.
+ *
+ *     The Eclipse Public License is available at
+ *     http://www.eclipse.org/legal/epl-v10.html
+ *
+ *     The Apache License v2.0 is available at
+ *     http://www.opensource.org/licenses/apache2.0.php
+ *
+ * You may elect to redistribute this code under either of these licenses.
+ */
 package io.vertx.spi.cluster.redis.impl;
 
 import java.util.ArrayList;
@@ -39,8 +53,8 @@ public class RedisAsyncMap<K, V> implements AsyncMap<K, V> {
 
 	@Override
 	public void get(K k, Handler<AsyncResult<V>> resultHandler) {
-		map.getAsync(k).whenComplete(
-				(v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
+		map.getAsync(k)
+				.whenComplete((v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
 	}
 
 	@Override
@@ -75,8 +89,8 @@ public class RedisAsyncMap<K, V> implements AsyncMap<K, V> {
 
 	@Override
 	public void removeIfPresent(K k, V v, Handler<AsyncResult<Boolean>> resultHandler) {
-		map.removeAsync(k, v).whenComplete((removed, e) -> resultHandler
-				.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(removed)));
+		map.removeAsync(k, v).whenComplete(
+				(removed, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(removed)));
 	}
 
 	@Override
@@ -87,8 +101,8 @@ public class RedisAsyncMap<K, V> implements AsyncMap<K, V> {
 
 	@Override
 	public void replaceIfPresent(K k, V oldValue, V newValue, Handler<AsyncResult<Boolean>> resultHandler) {
-		map.replaceAsync(k, oldValue, newValue).whenComplete((replaced, e) -> resultHandler
-				.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(replaced)));
+		map.replaceAsync(k, oldValue, newValue).whenComplete(
+				(replaced, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(replaced)));
 	}
 
 	@Override
@@ -99,14 +113,14 @@ public class RedisAsyncMap<K, V> implements AsyncMap<K, V> {
 
 	@Override
 	public void size(Handler<AsyncResult<Integer>> resultHandler) {
-		map.sizeAsync().whenComplete(
-				(v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
+		map.sizeAsync()
+				.whenComplete((v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
 	}
 
 	@Override
 	public void keys(Handler<AsyncResult<Set<K>>> resultHandler) {
-		map.readAllKeySetAsync().whenComplete(
-				(v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
+		map.readAllKeySetAsync()
+				.whenComplete((v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
 	}
 
 	@Override
@@ -119,8 +133,8 @@ public class RedisAsyncMap<K, V> implements AsyncMap<K, V> {
 
 	@Override
 	public void entries(Handler<AsyncResult<Map<K, V>>> resultHandler) {
-		map.readAllMapAsync().whenComplete(
-				(v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
+		map.readAllMapAsync()
+				.whenComplete((v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
 	}
 
 }

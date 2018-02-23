@@ -1,4 +1,18 @@
-
+/*
+ * Copyright (c) 2018 The original author or authors
+ * ------------------------------------------------------
+ * All rights reserved. This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License v1.0
+ * and Apache License v2.0 which accompanies this distribution.
+ *
+ *     The Eclipse Public License is available at
+ *     http://www.eclipse.org/legal/epl-v10.html
+ *
+ *     The Apache License v2.0 is available at
+ *     http://www.opensource.org/licenses/apache2.0.php
+ *
+ * You may elect to redistribute this code under either of these licenses.
+ */
 package io.vertx.spi.cluster.redis.impl;
 
 import java.util.ArrayList;
@@ -25,7 +39,6 @@ import io.vertx.spi.cluster.redis.RedisClusterManager;
  * When last node disconnected will still keep it's subs address. (Don't remove last node subs, "__vertx.subs" are not
  * empty !)
  * 
- * 
  * @see io.vertx.core.net.impl.ServerID
  * @see org.redisson.codec.JsonJacksonCodec
  * @author Leo Tu - leo.tu.taipei@gmail.com
@@ -35,8 +48,7 @@ public class RedisAsyncMultiMapSubs extends RedisAsyncMultiMap<String, ClusterNo
 
 	static private boolean debug = false;
 
-	public RedisAsyncMultiMapSubs(Vertx vertx, RedisClusterManager clusterManager, RedissonClient redisson,
-			String name) {
+	public RedisAsyncMultiMapSubs(Vertx vertx, RedisClusterManager clusterManager, RedissonClient redisson, String name) {
 		super(vertx, redisson, name);
 	}
 
