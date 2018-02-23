@@ -27,8 +27,6 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.function.Consumer;
 
 import org.redisson.api.RedissonClient;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import io.vertx.core.AsyncResult;
 import io.vertx.core.Handler;
@@ -38,6 +36,10 @@ import io.vertx.core.eventbus.impl.clustered.ClusteredEventBus;
 import io.vertx.core.impl.HAManager;
 import io.vertx.core.impl.VertxInternal;
 import io.vertx.core.json.JsonObject;
+//import org.slf4j.Logger;
+//import org.slf4j.LoggerFactory;
+import io.vertx.core.logging.Logger;
+import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.shareddata.Lock;
 import io.vertx.core.shareddata.impl.AsynchronousLock;
 
@@ -63,13 +65,17 @@ public class NonPublicAPI {
 	 * FIX: Non Vert.x thread
 	 */
 	public static void runOnContext(Vertx vertx, Handler<Void> action) {
-		vertx.getOrCreateContext().runOnContext(action);
+		if (Vertx.currentContext() != null) { // FIXME
+			action.handle(null);
+		} else {
+			vertx.getOrCreateContext().runOnContext(action);
+		}
 	}
 
 	public static boolean isInactive(Vertx vertx, RedissonClient redisson) {
 		final ClusteredEventBus eventBus = (ClusteredEventBus) vertx.eventBus();
 		if (eventBus != null) {
-			final HAManager haManager = getHAManager(vertx);
+			final HAManager haManager = ClusteredEventBusAPI.getHAManager(vertx);
 			final VertxInternal vertxInternal = (VertxInternal) vertx;
 			if (haManager != null) {
 				final boolean haManagerStopped = Reflection.getField(haManager, HAManager.class, "stopped");
@@ -88,57 +94,60 @@ public class NonPublicAPI {
 	 * @see HAManager#addDataToAHAInfo
 	 * @see HAManager#addHaInfoIfLost
 	 */
-	public static boolean addHaInfoIfLost(Vertx vertx, String nodeID) {
-		final HAManager haManager = getHAManager(vertx);
-		if (haManager == null) {
+	public static boolean addHaInfoIfLost(Vertx vertx, String nodeId) {
+		final JsonObject haInfo = ClusteredEventBusAPI.getHaInfo(vertx);
+		if (haInfo == null) {
+			log.debug("(haInfo == null)");
 			return false;
 		}
-		final JsonObject haInfo = getHaInfo(vertx);
-		final Map<String, String> clusterMap = Reflection.getFinalField(haManager, HAManager.class, "clusterMap");
-		clusterMap.put(nodeID, haInfo.encode());
+		final Map<String, String> clusterMap = HAManagerAPI.getClusterMap(vertx);
+		if (clusterMap == null) {
+			log.debug("(clusterMap == null)");
+			return false;
+		}
+		clusterMap.put(nodeId, haInfo.encode());
 		return true;
 	}
 
-	private static HAManager getHAManager(Vertx vertx) {
-		final ClusteredEventBus eventBus = (ClusteredEventBus) vertx.eventBus();
-		if (eventBus == null) {
-			log.debug("(eventBus == null)");
-			return null;
+	protected static class HAManagerAPI {
+		public static Map<String, String> getClusterMap(Vertx vertx) {
+			final HAManager haManager = ClusteredEventBusAPI.getHAManager(vertx);
+			return haManager == null ? null : Reflection.getFinalField(haManager, HAManager.class, "clusterMap");
 		}
-		HAManager haManager = Reflection.getFinalField(eventBus, ClusteredEventBus.class, "haManager");
-		if (haManager == null) {
-			log.debug("(haManager == null)");
-		}
-		return haManager;
 	}
 
-	/**
-	 * Local ConcurrentHashSet
-	 */
-	@SuppressWarnings("unused")
-	private static Set<String> getOwnSubs(Vertx vertx) {
-		final ClusteredEventBus eventBus = (ClusteredEventBus) vertx.eventBus();
-		if (eventBus == null) {
-			return null;
-		}
-		return Reflection.getField(eventBus, ClusteredEventBus.class, "ownSubs");
-	}
+	protected static class ClusteredEventBusAPI {
 
-	@SuppressWarnings("unused")
-	private static ClusterNodeInfo getClusterNodeInfo(Vertx vertx) {
-		final ClusteredEventBus eventBus = (ClusteredEventBus) vertx.eventBus();
-		if (eventBus == null) {
-			return null;
+		public static HAManager getHAManager(Vertx vertx) {
+			final ClusteredEventBus eventBus = (ClusteredEventBus) vertx.eventBus();
+			if (eventBus == null) {
+				log.debug("(eventBus == null)");
+				return null;
+			}
+			HAManager haManager = Reflection.getFinalField(eventBus, ClusteredEventBus.class, "haManager");
+			if (haManager == null) {
+				log.debug("(haManager == null)");
+			}
+			return haManager;
 		}
-		return Reflection.getField(eventBus, ClusteredEventBus.class, "nodeInfo");
-	}
 
-	public static JsonObject getHaInfo(Vertx vertx) {
-		final HAManager haManager = getHAManager(vertx);
-		if (haManager == null) {
-			return null;
+		/**
+		 * Local ConcurrentHashSet
+		 */
+		public static Set<String> getOwnSubs(Vertx vertx) {
+			final ClusteredEventBus eventBus = (ClusteredEventBus) vertx.eventBus();
+			return eventBus == null ? null : Reflection.getField(eventBus, ClusteredEventBus.class, "ownSubs");
 		}
-		return Reflection.getFinalField(haManager, HAManager.class, "haInfo");
+
+		public static ClusterNodeInfo getNodeInfo(Vertx vertx) {
+			final ClusteredEventBus eventBus = (ClusteredEventBus) vertx.eventBus();
+			return eventBus == null ? null : Reflection.getField(eventBus, ClusteredEventBus.class, "nodeInfo");
+		}
+
+		public static JsonObject getHaInfo(Vertx vertx) {
+			final HAManager haManager = getHAManager(vertx);
+			return haManager == null ? null : Reflection.getFinalField(haManager, HAManager.class, "haInfo");
+		}
 	}
 
 	protected static class Reflection {

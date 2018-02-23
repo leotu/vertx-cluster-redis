@@ -23,15 +23,22 @@ import java.util.StringTokenizer;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+//import org.slf4j.Logger;
+//import org.slf4j.LoggerFactory;
+import io.vertx.core.logging.Logger;
+import io.vertx.core.logging.LoggerFactory;
+import io.vertx.core.logging.SLF4JLogDelegateFactory;
 
 /**
  * 
  * @author Leo Tu - leo.tu.taipei@gmail.com
  */
 public class IpUtil {
-	private static final Logger log = LoggerFactory.getLogger(IpUtil.class);
+	private static final Logger log;
+	static {
+		System.setProperty(LoggerFactory.LOGGER_DELEGATE_FACTORY_CLASS_NAME, SLF4JLogDelegateFactory.class.getName());
+		log = LoggerFactory.getLogger(IpUtil.class);
+	}
 
 	private static final String VALID_IP_ADDRESS_REGEX = //
 			"^([01]?\\d\\d?|2[0-4]\\d|25[0-5])\\." + //

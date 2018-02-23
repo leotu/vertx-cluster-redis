@@ -24,8 +24,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.redisson.api.RMapCache;
 import org.redisson.api.RedissonClient;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import io.vertx.core.AsyncResult;
 import io.vertx.core.Future;
@@ -38,8 +36,6 @@ import io.vertx.core.shareddata.AsyncMap;
  * @author Leo Tu - leo.tu.taipei@gmail.com
  */
 public class RedisAsyncMap<K, V> implements AsyncMap<K, V> {
-	@SuppressWarnings("unused")
-	private static final Logger log = LoggerFactory.getLogger(RedisAsyncMap.class);
 
 	protected final Vertx vertx;
 	protected final RMapCache<K, V> map;

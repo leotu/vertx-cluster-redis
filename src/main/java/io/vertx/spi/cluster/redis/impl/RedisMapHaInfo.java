@@ -19,10 +19,12 @@ import java.util.concurrent.TimeUnit;
 
 import org.redisson.api.RMapCache;
 import org.redisson.api.RedissonClient;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import io.vertx.core.Vertx;
+//import org.slf4j.Logger;
+//import org.slf4j.LoggerFactory;
+import io.vertx.core.logging.Logger;
+import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.spi.cluster.NodeListener;
 import io.vertx.spi.cluster.redis.RedisClusterManager;
 

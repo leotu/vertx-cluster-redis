@@ -33,13 +33,16 @@ import org.redisson.api.map.event.EntryEvent.Type;
 import org.redisson.api.map.event.EntryExpiredListener;
 import org.redisson.api.map.event.EntryRemovedListener;
 import org.redisson.api.map.event.EntryUpdatedListener;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
+//import org.slf4j.Logger;
+//import org.slf4j.LoggerFactory;
+import io.vertx.core.logging.Logger;
+import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.spi.cluster.NodeListener;
 import io.vertx.spi.cluster.redis.RedisClusterManager;
+import io.vertx.spi.cluster.redis.impl.NonPublicAPI.ClusteredEventBusAPI;
 
 /**
  * TTL: "__vertx.haInfo"
@@ -205,7 +208,7 @@ public class RedisMapHaInfoTTLMonitor {
 	 * newOne will fire EntryCreatedListener(...)
 	 */
 	private void refreshAction(String nodeId) {
-		JsonObject haInfo = NonPublicAPI.getHaInfo(vertx);
+		JsonObject haInfo = ClusteredEventBusAPI.getHaInfo(vertx);
 		if (haInfo == null) {
 			log.warn("(haInfo == null)");
 			return;

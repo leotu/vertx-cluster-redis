@@ -13,14 +13,16 @@ import org.redisson.api.RAtomicLong;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import io.vertx.core.AsyncResult;
 import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
+//import org.slf4j.Logger;
+//import org.slf4j.LoggerFactory;
+import io.vertx.core.logging.Logger;
+import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.shareddata.AsyncMap;
 import io.vertx.core.shareddata.Counter;
 import io.vertx.core.shareddata.Lock;
@@ -47,7 +49,7 @@ public class RedisClusterManager implements ClusterManager {
 	private Vertx vertx;
 	private final RedissonClient redisson;
 	private final boolean customClient;
-	private String nodeID;
+	private String nodeId;
 
 	private volatile boolean active;
 	private NodeListener nodeListener;
@@ -58,11 +60,11 @@ public class RedisClusterManager implements ClusterManager {
 	public static final String CLUSTER_MAP_NAME = NonPublicAPI.HA_CLUSTER_MAP_NAME;
 	public static final String SUBS_MAP_NAME = NonPublicAPI.EB_SUBS_MAP_NAME;
 
-	public RedisClusterManager(RedissonClient redisson, String nodeID) {
+	public RedisClusterManager(RedissonClient redisson, String nodeId) {
 		Objects.requireNonNull(redisson, "redisson");
-		Objects.requireNonNull(nodeID, "nodeID");
+		Objects.requireNonNull(nodeId, "nodeId");
 		this.redisson = redisson;
-		this.nodeID = nodeID;
+		this.nodeId = nodeId;
 		this.customClient = true;
 	}
 
@@ -78,8 +80,8 @@ public class RedisClusterManager implements ClusterManager {
 				.setAddress("redis://" + redisHost + ":" + redisPort) //
 				.setDatabase(database);
 		this.redisson = Redisson.create(redissonConfig);
-		this.nodeID = redisHost + "_" + redisPort;
-		this.nodeID = UUID.nameUUIDFromBytes(nodeID.getBytes(StandardCharsets.UTF_8)).toString();
+		this.nodeId = redisHost + "_" + redisPort;
+		this.nodeId = UUID.nameUUIDFromBytes(nodeId.getBytes(StandardCharsets.UTF_8)).toString();
 		this.customClient = false;
 	}
 
@@ -135,7 +137,7 @@ public class RedisClusterManager implements ClusterManager {
 			lock.tryLockAsync(timeout, TimeUnit.MILLISECONDS).whenComplete((v, e) -> resultHandler
 					.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(new RedisLock(lock))));
 		} catch (Exception e) {
-			log.warn("nodeID: " + nodeID + ", name: " + name + ", timeout: " + timeout, e);
+			log.warn("nodeId: " + nodeId + ", name: " + name + ", timeout: " + timeout, e);
 			resultHandler.handle(Future.failedFuture(e));
 		}
 	}
@@ -146,14 +148,14 @@ public class RedisClusterManager implements ClusterManager {
 			RAtomicLong counter = redisson.getAtomicLong(name);
 			resultHandler.handle(Future.succeededFuture(new RedisCounter(counter)));
 		} catch (Exception e) {
-			log.error("nodeID: " + nodeID + ", name: " + name, e);
+			log.error("nodeId: " + nodeId + ", name: " + name, e);
 			resultHandler.handle(Future.failedFuture(e));
 		}
 	}
 
 	@Override
 	public String getNodeID() {
-		return nodeID;
+		return nodeId;
 	}
 
 	/**
@@ -174,24 +176,24 @@ public class RedisClusterManager implements ClusterManager {
 	public void nodeListener(NodeListener nodeListener) {
 		this.nodeListener = new NodeListener() {
 			@Override
-			synchronized public void nodeAdded(String nodeID) {
+			synchronized public void nodeAdded(String nodeId) {
 				if (!isInactive()) {
-					nodeListener.nodeAdded(nodeID);
-					// AsyncLocalLock.executeBlocking(vertx, nodeID, lockTimeoutInSeconds, () ->
-					// nodeListener.nodeAdded(nodeID));
+					nodeListener.nodeAdded(nodeId);
+					// AsyncLocalLock.executeBlocking(vertx, nodeId, lockTimeoutInSeconds, () ->
+					// nodeListener.nodeAdded(nodeId));
 				} else {
-					log.warn("Inactive, skip execute nodeAdded({})", nodeID);
+					log.warn("Inactive, skip execute nodeAdded({})", nodeId);
 				}
 			}
 
 			@Override
-			synchronized public void nodeLeft(String nodeID) {
+			synchronized public void nodeLeft(String nodeId) {
 				if (!isInactive()) {
-					nodeListener.nodeLeft(nodeID);
-					// AsyncLocalLock.executeBlocking(vertx, nodeID, lockTimeoutInSeconds,
-					// () -> nodeListener.nodeLeft(nodeID));
+					nodeListener.nodeLeft(nodeId);
+					// AsyncLocalLock.executeBlocking(vertx, nodeId, lockTimeoutInSeconds,
+					// () -> nodeListener.nodeLeft(nodeId));
 				} else {
-					log.warn("Inactive, skip execute nodeLeft({})", nodeID);
+					log.warn("Inactive, skip execute nodeLeft({})", nodeId);
 				}
 			}
 		};
