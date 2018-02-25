@@ -36,7 +36,7 @@ import io.vertx.spi.cluster.redis.RedisClusterManager;
 public class RedisMapHaInfo extends RedisMap<String, String> {
 	private static final Logger log = LoggerFactory.getLogger(RedisMapHaInfo.class);
 
-	private int timeToLiveSeconds = 10; // TTL seconds
+	private int timeToLiveSeconds = 10; // default TTL seconds
 
 	private final RedisClusterManager clusterManager;
 	private final RMapCache<String, String> mapAsync;
@@ -76,10 +76,10 @@ public class RedisMapHaInfo extends RedisMap<String, String> {
 	public String put(String key, String value) {
 		try {
 			return mapAsync.put(key, value, timeToLiveSeconds, TimeUnit.SECONDS);
-		} catch (Exception e) {
+		} catch (Exception ignore) {
 			String previous = super.put(key, value);
 			log.warn("retry without TTL: key: {}, value: {}, previous: {}, timeToLiveSeconds: {}, error: {}", key, value,
-					previous, timeToLiveSeconds, e.toString());
+					previous, timeToLiveSeconds, ignore.toString());
 			return previous;
 		}
 	}

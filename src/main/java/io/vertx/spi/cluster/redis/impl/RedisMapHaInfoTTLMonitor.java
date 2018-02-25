@@ -41,8 +41,9 @@ import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.spi.cluster.NodeListener;
+import io.vertx.spi.cluster.redis.NonPublicAPI;
+import io.vertx.spi.cluster.redis.NonPublicAPI.ClusteredEventBusAPI;
 import io.vertx.spi.cluster.redis.RedisClusterManager;
-import io.vertx.spi.cluster.redis.impl.NonPublicAPI.ClusteredEventBusAPI;
 
 /**
  * TTL: "__vertx.haInfo"
@@ -89,63 +90,65 @@ public class RedisMapHaInfoTTLMonitor {
 	 * @see io.vertx.core.impl.HAManager#nodeAdded
 	 * @see io.vertx.core.impl.HAManager#nodeLeft
 	 */
-	public void attachListener(NodeListener nodeListener) {
-		this.removedListeneId = mapAsync.addListener(new EntryRemovedListener<String, String>() {
-			@Override
-			public void onRemoved(EntryEvent<String, String> event) {
-				String nodeId = event.getKey();
-				if (debug) {
-					log.debug("********** removed(nodeLeft): nodeId={}, clusterManager.nodeId={}", nodeId,
-							clusterManager.getNodeID());
-				}
-				nodeListener.nodeLeft(nodeId);
-			}
-		});
-
-		//
-		this.expiredListenerId = mapAsync.addListener(new EntryExpiredListener<String, String>() {
-			@Override
-			public void onExpired(EntryEvent<String, String> event) {
-				String nodeId = event.getKey();
-				if (debug) {
-					log.debug("********** expired(nodeLeft): nodeId={}, clusterManager.nodeId={}", nodeId,
-							clusterManager.getNodeID());
-				}
-				nodeListener.nodeLeft(nodeId);
-			}
-		});
-
-		//
-		this.createdListenerId = mapAsync.addListener(new EntryCreatedListener<String, String>() {
-			{
-				nodeCreatedNofity = this;
-			}
-
-			@Override
-			public void onCreated(EntryEvent<String, String> event) {
-				String nodeId = event.getKey();
-				if (debug) {
-					log.debug("********** created(nodeAdded): nodeId={}, clusterManager.nodeId={}", nodeId,
-							clusterManager.getNodeID());
-				}
-				nodeListener.nodeAdded(nodeId);
-			}
-		});
-
-		//
-		this.updatedListenerId = mapAsync.addListener(new EntryUpdatedListener<String, String>() {
-			@Override
-			public void onUpdated(EntryEvent<String, String> event) {
-				if (clusterManager.getNodeID().equals(event.getKey())) { // only work on self's node
+	protected void attachListener(NodeListener nodeListener) {
+		if (removedListeneId == 0) {
+			removedListeneId = mapAsync.addListener(new EntryRemovedListener<String, String>() {
+				@Override
+				public void onRemoved(EntryEvent<String, String> event) {
 					String nodeId = event.getKey();
 					if (debug) {
-						log.debug("********** onUpdated(clusterNodeAttached): nodeId={}, clusterManager.nodeId={}", nodeId,
-								clusterManager.getNodeID());
+						log.debug("removed(nodeLeft): nodeId={}, clusterManager.nodeId={}", nodeId, clusterManager.getNodeID());
 					}
-					clusterNodeAttached(nodeId, event.getValue());
+					nodeListener.nodeLeft(nodeId);
 				}
-			}
-		});
+			});
+		}
+
+		if (expiredListenerId == 0) {
+			expiredListenerId = mapAsync.addListener(new EntryExpiredListener<String, String>() {
+				@Override
+				public void onExpired(EntryEvent<String, String> event) {
+					String nodeId = event.getKey();
+					if (debug) {
+						log.debug("expired(nodeLeft): nodeId={}, clusterManager.nodeId={}", nodeId, clusterManager.getNodeID());
+					}
+					nodeListener.nodeLeft(nodeId);
+				}
+			});
+		}
+
+		if (createdListenerId == 0) {
+			createdListenerId = mapAsync.addListener(new EntryCreatedListener<String, String>() {
+				{
+					nodeCreatedNofity = this;
+				}
+
+				@Override
+				public void onCreated(EntryEvent<String, String> event) {
+					String nodeId = event.getKey();
+					if (debug) {
+						log.debug("created(nodeAdded): nodeId={}, clusterManager.nodeId={}", nodeId, clusterManager.getNodeID());
+					}
+					nodeListener.nodeAdded(nodeId);
+				}
+			});
+		}
+
+		if (updatedListenerId == 0) {
+			updatedListenerId = mapAsync.addListener(new EntryUpdatedListener<String, String>() {
+				@Override
+				public void onUpdated(EntryEvent<String, String> event) {
+					if (clusterManager.getNodeID().equals(event.getKey())) { // only work on self's node
+						String nodeId = event.getKey();
+						if (debug) {
+							log.debug("onUpdated(clusterNodeAttached): nodeId={}, clusterManager.nodeId={}", nodeId,
+									clusterManager.getNodeID());
+						}
+						clusterNodeAttached(nodeId, event.getValue());
+					}
+				}
+			});
+		}
 	}
 
 	/**
@@ -163,8 +166,7 @@ public class RedisMapHaInfoTTLMonitor {
 			if (nodes.size() == 1 && nodes.get(0).equals(clusterManager.getNodeID())) {
 				EntryEvent<String, String> event = new EntryEvent<>(mapAsync, Type.CREATED, nodeId, value, value);
 				if (debug) {
-					log.debug("********** nodeCreatedNofity.onCreated, nodeId={}, serverID={}, value={}", nodeId, serverID,
-							value);
+					log.debug("nodeCreatedNofity.onCreated, nodeId={}, serverID={}, value={}", nodeId, serverID, value);
 				}
 				nodeCreatedNofity.onCreated(event);
 			}
@@ -179,7 +181,7 @@ public class RedisMapHaInfoTTLMonitor {
 		}
 		resetTTL.computeIfAbsent(nodeId, key -> {
 			int nodeTTL = redisMapHaInfo.getTimeToLiveSeconds();
-			// int refreshDelay = 15 * 1000; // debugging lost node
+			// int refreshDelay = 30 * 1000; // debugging lost node
 			int refreshDelay = (nodeTTL / 2.0) < refreshIntervalSeconds ? (nodeTTL * 1000) / 2
 					: refreshIntervalSeconds * 1000; // milliseconds
 			if (debug) {
@@ -187,7 +189,7 @@ public class RedisMapHaInfoTTLMonitor {
 						nodeTTL, refreshDelay, resetTTL);
 			}
 			long timeId = vertx.setPeriodic(refreshDelay, id -> {
-				if (clusterManager.isInactive()) {
+				if (!clusterManager.isActive()) {
 					if (debug) {
 						log.warn("inactive nodeId={}, id={}, faultTimeMaker={}", nodeId, id, faultTimeMaker.get());
 					}
@@ -208,7 +210,7 @@ public class RedisMapHaInfoTTLMonitor {
 	 * newOne will fire EntryCreatedListener(...)
 	 */
 	private void refreshAction(String nodeId) {
-		JsonObject haInfo = ClusteredEventBusAPI.getHaInfo(vertx);
+		JsonObject haInfo = ClusteredEventBusAPI.getHaInfo(ClusteredEventBusAPI.getHAManager(clusterManager.getEventBus()));
 		if (haInfo == null) {
 			log.warn("(haInfo == null)");
 			return;
@@ -279,7 +281,7 @@ public class RedisMapHaInfoTTLMonitor {
 	 */
 	private void checkRejoin(Date faultTime, String haInfo) {
 		String nodeId = clusterManager.getNodeID();
-		if (clusterManager.isInactive()) {
+		if (!clusterManager.isActive()) {
 			if (debug) {
 				log.warn("inactive nodeId={}, haInfo={}, faultTime={}", nodeId, haInfo, faultTime);
 			}
@@ -289,7 +291,7 @@ public class RedisMapHaInfoTTLMonitor {
 			if (debug) {
 				log.debug("call addHaInfoIfLost(...), nodeId={}, haInfo={}", nodeId, haInfo);
 			}
-			NonPublicAPI.addHaInfoIfLost(vertx, nodeId); // XXX
+			NonPublicAPI.addHaInfoIfLost(ClusteredEventBusAPI.getHAManager(clusterManager.getEventBus()), nodeId); // XXX
 		}
 
 		if (faultTime != null && haInfo != null) {
@@ -313,21 +315,34 @@ public class RedisMapHaInfoTTLMonitor {
 		this.refreshIntervalSeconds = refreshIntervalSeconds;
 	}
 
-	public void stop() {
-		try {
+	private void detachListener() {
+		if (removedListeneId != 0) {
 			mapAsync.removeListener(removedListeneId);
-			mapAsync.removeListener(expiredListenerId);
-			mapAsync.removeListener(createdListenerId);
-			if (updatedListenerId != 0) {
-				mapAsync.removeListener(updatedListenerId);
-			}
-		} catch (Exception e) {
-			log.warn(e.toString());
+			removedListeneId = 0;
 		}
+		if (expiredListenerId != 0) {
+			mapAsync.removeListener(expiredListenerId);
+			expiredListenerId = 0;
+		}
+		if (createdListenerId != 0) {
+			mapAsync.removeListener(createdListenerId);
+			createdListenerId = 0;
+		}
+		if (updatedListenerId != 0) {
+			mapAsync.removeListener(updatedListenerId);
+			updatedListenerId = 0;
+		}
+	}
+
+	private void stopScheduler() {
 		resetTTL.forEach((k, timeId) -> {
 			vertx.cancelTimer(timeId);
 		});
 		resetTTL.clear();
 	}
 
+	protected void stop() {
+		detachListener();
+		stopScheduler();
+	}
 }

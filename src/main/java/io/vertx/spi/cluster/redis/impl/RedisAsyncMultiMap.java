@@ -54,11 +54,13 @@ public class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 
 	protected ConcurrentMap<K, AtomicReference<V>> choosableSetPtr = new ConcurrentHashMap<>();
 	protected final RedissonClient redisson;
+	protected final Vertx vertx;
 	protected final RSetMultimap<K, V> mmap;
 
 	public RedisAsyncMultiMap(Vertx vertx, RedissonClient redisson, String name) {
 		Objects.requireNonNull(redisson, "redisson");
 		Objects.requireNonNull(name, "name");
+		this.vertx = vertx;
 		this.redisson = redisson;
 		this.mmap = redisson.getSetMultimap(name);
 	}
@@ -139,7 +141,7 @@ public class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 								// log.debug("skip remove key={}, value={}", key, value);
 								// }
 								// });
-								// CompositeFuture.all(valueFutures).setHandler(keyFuture);
+								// CompositeFuture.join(valueFutures).setHandler(keyFuture); // XXX: join or all ?
 								// ========================
 
 								List<V> deletedList = new ArrayList<>();
@@ -177,7 +179,7 @@ public class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 					});
 				}
 				//
-				CompositeFuture.all(new ArrayList<>(keyFutures.values())).setHandler(
+				CompositeFuture.join(new ArrayList<>(keyFutures.values())).setHandler(
 						ar -> completionHandler.handle(ar.failed() ? Future.failedFuture(ar.cause()) : Future.succeededFuture()));
 			}
 		});
