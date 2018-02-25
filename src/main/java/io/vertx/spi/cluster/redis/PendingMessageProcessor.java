@@ -19,16 +19,18 @@ import io.vertx.spi.cluster.redis.NonPublicAPI.ClusteredEventBusAPI;
 import io.vertx.spi.cluster.redis.impl.RedisAsyncMultiMapSubs;
 
 /**
+ * Tryable to choose another servver ID
  * 
  * @author leo.tu.taipei@gmail.com, leo@syncpo.com
  */
 public class PendingMessageProcessor implements BiConsumer<ServerID, Queue<ClusteredMessage<?, ?>>> {
 	private static final Logger log = LoggerFactory.getLogger(PendingMessageProcessor.class);
 
-	static private boolean debug = false;
+	static private boolean debug = true;
 
 	final static private String HA_ORIGINAL_SERVER_ID_KEY = "_HA_ORIGINAL_SERVER_ID";
 	final static private String HA_RESEND_SERVER_ID_KEY = "_HA_RESEND_SERVER_ID";
+	final static private String HA_RESEND_AGAIN_SERVER_ID_KEY = "_HA_RESEND_AGAIN_SERVER_ID";
 
 	private final ClusteredEventBus eventBus;
 	private final Context sendNoContext;
@@ -51,45 +53,64 @@ public class PendingMessageProcessor implements BiConsumer<ServerID, Queue<Clust
 		Objects.requireNonNull(pending, "pending");
 		ClusteredMessage<?, ?> message;
 		while ((message = pending.poll()) != null) { // FIFO
-			if (message.isSend() && !message.isFromWire() && !discard(message)) { // skip Publish & readFromWire
+			if (!discard(message)) {
 				resend(serverID, message);
-			} else {
-				if (debug) {
-					log.debug("discard: {}, publish mode: {}, read from wire: {}", discard(message), !message.isSend(),
-							message.isFromWire());
-				}
 			}
 		}
 		// pending.forEach(message -> { // FIFO
-		// if (message.isSend() && !message.isFromWire()) { // skip Publish & readFromWire
+		// if (!discard(message)) {
 		// resend(serverID, message);
 		// }
 		// });
 	}
 
 	private boolean discard(ClusteredMessage<?, ?> message) {
-		String haOriginalServerId = message.headers().get(HA_ORIGINAL_SERVER_ID_KEY);
-		String haResendServerId = message.headers().get(HA_RESEND_SERVER_ID_KEY);
-		if (haOriginalServerId != null || haResendServerId != null) {
+		if (!message.isSend()) { // skip Publish
 			if (debug) {
-				log.debug("discard & don't resend: haOriginalServerId: {}, haResendServerId: {}", haOriginalServerId,
-						haResendServerId);
+				log.debug("discard(!message.isSend()): address: {}", message.address());
 			}
 			return true;
+		}
+		if (message.isFromWire()) { // skip readFromWire
+			if (debug) {
+				log.debug("discard(message.isFromWire()): address: {}", message.address());
+			}
+			return true;
+		}
+
+		String haOriginalServerId = message.headers().get(HA_ORIGINAL_SERVER_ID_KEY);
+		String haResendServerId = message.headers().get(HA_RESEND_SERVER_ID_KEY);
+		String haResendAgainServerId = message.headers().get(HA_RESEND_AGAIN_SERVER_ID_KEY);
+
+		if (haResendAgainServerId != null) {
+			if (debug) {
+				log.debug(
+						"discard(haResendAgainServerId != null): haResendAgainServerId: {}, haResendServerId: {}, haResendAgainServerId: {}, address: {}",
+						haResendAgainServerId, haResendServerId, haResendAgainServerId, message.address());
+			}
+			return true; // had retry 2 times
+		}
+		if (haOriginalServerId != null && haResendServerId != null && haOriginalServerId.equals(haResendServerId)) {
+			if (debug) {
+				log.debug(
+						"discard(haOriginalServerId.equals(haResendServerId)): haResendAgainServerId: {}, haResendServerId: {}, haResendAgainServerId: {}, address: {}",
+						haResendAgainServerId, haResendServerId, haResendAgainServerId, message.address());
+			}
+			return true; // had retry original server
 		}
 		return false;
 	}
 
-	private void resend(ServerID excludedServerID, ClusteredMessage<?, ?> message) {
+	private void resend(ServerID failedServerID, ClusteredMessage<?, ?> message) {
 		String address = message.address();
 		Handler<AsyncResult<ChoosableIterable<ClusterNodeInfo>>> resultHandler = asyncResult -> {
 			if (asyncResult.succeeded()) {
 				ChoosableIterable<ClusterNodeInfo> serverIDs = asyncResult.result();
 				if (serverIDs != null && !serverIDs.isEmpty()) {
-					resendToSubs(excludedServerID, message, serverIDs);
+					resendToSubs(failedServerID, message, serverIDs);
 				}
 			} else {
-				log.warn("Failed to resend message, original failed server id: " + excludedServerID, asyncResult.cause());
+				log.warn("Failed to resend message, previous failed server id: " + failedServerID, asyncResult.cause());
 			}
 		};
 		if (Vertx.currentContext() == null) {
@@ -102,29 +123,39 @@ public class PendingMessageProcessor implements BiConsumer<ServerID, Queue<Clust
 		}
 	}
 
-	private <T> void resendToSubs(ServerID excludedServerID, ClusteredMessage<?, ?> message,
+	/**
+	 * Choose new one
+	 * 
+	 * @param originalServerID failed server
+	 */
+	private <T> void resendToSubs(ServerID failedServerID, ClusteredMessage<?, ?> message,
 			ChoosableIterable<ClusterNodeInfo> subs) {
 		// Choose one
 		ClusterNodeInfo ci = subs.choose();
 		ServerID sid = null;
 		while ((ci = subs.choose()) != null) {
 			sid = ci.serverID;
-			if (!sid.equals(excludedServerID) && !sid.equals(selfServerID)) {
+			if (!sid.equals(failedServerID) && !sid.equals(selfServerID)) {
 				break;
 			}
 		}
 		if (sid == null) {
-			if (debug) {
-				log.debug("(sid == null), reset to original serverID(excluded): {}", excludedServerID);
-			}
-			sid = excludedServerID;
+			log.info("new one not found and return to failed server again: {}, address: {}", failedServerID,
+					message.address());
+			sid = failedServerID;
 		} else {
-			if (debug) {
-				log.debug("new serverID: {}, original serverID(excluded): {}", sid, excludedServerID);
-			}
+			log.info("switch to new server: {}, previous failed server: {}, address: {}", sid, failedServerID,
+					message.address());
 		}
-		message.headers().set(HA_ORIGINAL_SERVER_ID_KEY, excludedServerID.toString());
-		message.headers().set(HA_RESEND_SERVER_ID_KEY, sid.toString());
+
+		String originalServerId = message.headers().get(HA_ORIGINAL_SERVER_ID_KEY);
+		if (originalServerId == null) {
+			message.headers().set(HA_ORIGINAL_SERVER_ID_KEY, failedServerID.toString());
+			message.headers().set(HA_RESEND_SERVER_ID_KEY, sid.toString());
+		} else {
+			message.headers().set(HA_RESEND_SERVER_ID_KEY, failedServerID.toString());
+			message.headers().set(HA_RESEND_AGAIN_SERVER_ID_KEY, sid.toString());
+		}
 		ClusteredEventBusAPI.sendRemote(eventBus, sid, message);
 	}
 
