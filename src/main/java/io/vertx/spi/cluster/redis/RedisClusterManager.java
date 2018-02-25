@@ -44,6 +44,7 @@ import io.vertx.spi.cluster.redis.impl.RedisMap;
 import io.vertx.spi.cluster.redis.impl.RedisMapHaInfo;
 
 /**
+ * https://github.com/redisson/redisson/wiki/11.-Redis-commands-mapping
  * 
  * @see io.vertx.core.impl.VertxFactoryImpl#clusteredVertx
  * @author Leo Tu - leo.tu.taipei@gmail.com
@@ -66,8 +67,8 @@ public class RedisClusterManager implements ClusterManager {
 	private RedisMapHaInfo haInfo;
 	private RedisAsyncMultiMapSubs subs;
 
-	public static final String CLUSTER_MAP_NAME = NonPublicAPI.HA_CLUSTER_MAP_NAME;
-	public static final String SUBS_MAP_NAME = NonPublicAPI.EB_SUBS_MAP_NAME;
+	private static final String CLUSTER_MAP_NAME = NonPublicAPI.HA_CLUSTER_MAP_NAME;
+	private static final String SUBS_MAP_NAME = NonPublicAPI.EB_SUBS_MAP_NAME;
 
 	public RedisClusterManager(RedissonClient redisson, String nodeId) {
 		Objects.requireNonNull(redisson, "redisson");

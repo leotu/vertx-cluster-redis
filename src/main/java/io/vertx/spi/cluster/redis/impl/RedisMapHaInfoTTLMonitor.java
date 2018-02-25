@@ -52,7 +52,7 @@ import io.vertx.spi.cluster.redis.RedisClusterManager;
  * @see org.redisson.api.RedissonClient#getExecutorService
  * @author Leo Tu - leo.tu.taipei@gmail.com
  */
-public class RedisMapHaInfoTTLMonitor {
+class RedisMapHaInfoTTLMonitor {
 	private static final Logger log = LoggerFactory.getLogger(RedisMapHaInfoTTLMonitor.class);
 
 	static private boolean debug = false;

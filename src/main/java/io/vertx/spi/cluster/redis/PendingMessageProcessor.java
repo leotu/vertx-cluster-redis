@@ -23,7 +23,7 @@ import io.vertx.spi.cluster.redis.impl.RedisAsyncMultiMapSubs;
  * 
  * @author leo.tu.taipei@gmail.com, leo@syncpo.com
  */
-public class PendingMessageProcessor implements BiConsumer<ServerID, Queue<ClusteredMessage<?, ?>>> {
+class PendingMessageProcessor implements BiConsumer<ServerID, Queue<ClusteredMessage<?, ?>>> {
 	private static final Logger log = LoggerFactory.getLogger(PendingMessageProcessor.class);
 
 	static private boolean debug = true;
