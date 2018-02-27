@@ -132,7 +132,7 @@ public class RedisClusterManager implements ClusterManager {
 				if (ok) {
 					Queue<ClusteredMessage<?, ?>> pending = Reflection.getField(connHolder, connHolder.getClass(), "pending");
 					if (pending != null && !pending.isEmpty()) {
-						pendingProcessor.accept((ServerID) serverID, pending);
+						pendingProcessor.run((ServerID) serverID, pending);
 					}
 				} else {
 					if (debug) {

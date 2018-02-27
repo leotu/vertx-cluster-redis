@@ -17,7 +17,6 @@ package io.vertx.spi.cluster.redis;
 
 import java.util.Objects;
 import java.util.Queue;
-import java.util.function.BiConsumer;
 
 import io.vertx.core.AsyncResult;
 import io.vertx.core.Context;
@@ -38,7 +37,7 @@ import io.vertx.spi.cluster.redis.impl.RedisAsyncMultiMapSubs;
  * 
  * @author Leo Tu - leo.tu.taipei@gmail.com
  */
-class PendingMessageProcessor implements BiConsumer<ServerID, Queue<ClusteredMessage<?, ?>>> {
+class PendingMessageProcessor {
 	private static final Logger log = LoggerFactory.getLogger(PendingMessageProcessor.class);
 
 	static private boolean debug = true;
@@ -62,8 +61,7 @@ class PendingMessageProcessor implements BiConsumer<ServerID, Queue<ClusteredMes
 	/**
 	 * Async ?
 	 */
-	@Override
-	public void accept(ServerID serverID, Queue<ClusteredMessage<?, ?>> pending) {
+	public void run(ServerID serverID, Queue<ClusteredMessage<?, ?>> pending) {
 		Objects.requireNonNull(serverID, "serverID");
 		Objects.requireNonNull(pending, "pending");
 		ClusteredMessage<?, ?> message;
