@@ -31,7 +31,7 @@ import io.vertx.core.shareddata.impl.AsynchronousLock;
  * Asynchronous Local Lock Utility
  * 
  * @see io.vertx.core.shareddata.impl.SharedDataImpl
- * @author Leo Tu - leo.tu.taipei@gmail.com
+ * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
 public class AsyncLocalLock {
 	private static final Logger log = LoggerFactory.getLogger(AsyncLocalLock.class);

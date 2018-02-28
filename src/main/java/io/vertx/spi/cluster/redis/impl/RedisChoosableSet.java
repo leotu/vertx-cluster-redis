@@ -27,7 +27,7 @@ import io.vertx.core.spi.cluster.ChoosableIterable;
 
 /**
  * 
- * @author Leo Tu - leo.tu.taipei@gmail.com
+ * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
 @SuppressWarnings("serial")
 class RedisChoosableSet<T> implements ChoosableIterable<T>, Serializable {

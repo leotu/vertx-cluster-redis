@@ -35,7 +35,7 @@ import io.vertx.spi.cluster.redis.impl.RedisAsyncMultiMapSubs;
 /**
  * Tryable to choose another server ID
  * 
- * @author Leo Tu - leo.tu.taipei@gmail.com
+ * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
 class PendingMessageProcessor {
 	private static final Logger log = LoggerFactory.getLogger(PendingMessageProcessor.class);
@@ -50,8 +50,11 @@ class PendingMessageProcessor {
 	private final Context sendNoContext;
 	private final ServerID selfServerID; // self
 	private final RedisAsyncMultiMapSubs subs;
+	private final RedisClusterManager clusterManager;
 
-	public PendingMessageProcessor(Vertx vertx, ClusteredEventBus eventBus, RedisAsyncMultiMapSubs subs) {
+	public PendingMessageProcessor(Vertx vertx, RedisClusterManager clusterManager, ClusteredEventBus eventBus,
+			RedisAsyncMultiMapSubs subs) {
+		this.clusterManager = clusterManager;
 		this.eventBus = eventBus;
 		this.subs = subs;
 		this.sendNoContext = vertx.getOrCreateContext();
@@ -66,15 +69,15 @@ class PendingMessageProcessor {
 		Objects.requireNonNull(pending, "pending");
 		ClusteredMessage<?, ?> message;
 		while ((message = pending.poll()) != null) { // FIFO
-			if (!discard(message)) {
+			if (!clusterManager.isActive()) {
+				if (debug) {
+					log.debug("!isActive(), serverID: {}, pending.size: {}", serverID, pending.size());
+				}
+				pending.clear();
+			} else if (!discard(message)) {
 				resend(serverID, message);
 			}
 		}
-		// pending.forEach(message -> { // FIFO
-		// if (!discard(message)) {
-		// resend(serverID, message);
-		// }
-		// });
 	}
 
 	private boolean discard(ClusteredMessage<?, ?> message) {

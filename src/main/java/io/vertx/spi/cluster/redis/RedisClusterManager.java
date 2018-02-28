@@ -62,7 +62,7 @@ import io.vertx.spi.cluster.redis.impl.RedisMapHaInfo;
  * https://github.com/redisson/redisson/wiki/11.-Redis-commands-mapping
  * 
  * @see io.vertx.core.impl.VertxFactoryImpl#clusteredVertx
- * @author Leo Tu - leo.tu.taipei@gmail.com
+ * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
 public class RedisClusterManager implements ClusterManager {
 	private static final Logger log = LoggerFactory.getLogger(RedisClusterManager.class);
@@ -119,7 +119,8 @@ public class RedisClusterManager implements ClusterManager {
 				.getConnections(this.eventBus);
 		@SuppressWarnings("serial")
 		ConcurrentMap<ServerID, Object> newOne = new ConcurrentHashMap<ServerID, Object>() {
-			PendingMessageProcessor pendingProcessor = new PendingMessageProcessor(vertx, eventBus, subs);
+			PendingMessageProcessor pendingProcessor = new PendingMessageProcessor(vertx, RedisClusterManager.this, eventBus,
+					subs);
 
 			/**
 			 * @param key is ServerID type

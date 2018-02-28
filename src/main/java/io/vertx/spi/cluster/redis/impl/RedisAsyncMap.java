@@ -33,7 +33,7 @@ import io.vertx.core.shareddata.AsyncMap;
 
 /**
  *
- * @author Leo Tu - leo.tu.taipei@gmail.com
+ * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
 public class RedisAsyncMap<K, V> implements AsyncMap<K, V> {
 

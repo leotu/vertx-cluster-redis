@@ -50,7 +50,7 @@ import io.vertx.spi.cluster.redis.RedisClusterManager;
  * 
  * @see org.redisson.api.RScheduledExecutorService
  * @see org.redisson.api.RedissonClient#getExecutorService
- * @author Leo Tu - leo.tu.taipei@gmail.com
+ * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
 class RedisMapHaInfoTTLMonitor {
 	private static final Logger log = LoggerFactory.getLogger(RedisMapHaInfoTTLMonitor.class);
@@ -182,8 +182,11 @@ class RedisMapHaInfoTTLMonitor {
 		resetTTL.computeIfAbsent(nodeId, key -> {
 			int nodeTTL = redisMapHaInfo.getTimeToLiveSeconds();
 			// int refreshDelay = 30 * 1000; // debugging lost node
-			int refreshDelay = (nodeTTL / 2.0) < refreshIntervalSeconds ? (nodeTTL * 1000) / 2
+			int refreshDelay = (nodeTTL / 3.0) < refreshIntervalSeconds ? (nodeTTL * 1000) / 3
 					: refreshIntervalSeconds * 1000; // milliseconds
+			if (refreshDelay < 2000) {
+				refreshDelay = 2000;
+			}
 			if (debug) {
 				log.debug("nodeId={}, nodeTTL seconds={}, refresh delay milliseconds={}, current Nodes' TTL={}", nodeId,
 						nodeTTL, refreshDelay, resetTTL);
@@ -191,7 +194,7 @@ class RedisMapHaInfoTTLMonitor {
 			long timeId = vertx.setPeriodic(refreshDelay, id -> {
 				if (!clusterManager.isActive()) {
 					if (debug) {
-						log.warn("inactive nodeId={}, id={}, faultTimeMaker={}", nodeId, id, faultTimeMaker.get());
+						log.warn("!isActive(), nodeId={}, id={}, faultTimeMaker={}", nodeId, id, faultTimeMaker.get());
 					}
 					vertx.cancelTimer(id);
 					resetTTL.remove(nodeId, id);
@@ -283,7 +286,7 @@ class RedisMapHaInfoTTLMonitor {
 		String nodeId = clusterManager.getNodeID();
 		if (!clusterManager.isActive()) {
 			if (debug) {
-				log.warn("inactive nodeId={}, haInfo={}, faultTime={}", nodeId, haInfo, faultTime);
+				log.warn("!isActive(), nodeId={}, haInfo={}, faultTime={}", nodeId, haInfo, faultTime);
 			}
 			return;
 		}

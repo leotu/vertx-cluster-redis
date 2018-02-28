@@ -31,7 +31,7 @@ import io.vertx.spi.cluster.redis.RedisClusterManager;
 /**
  * CLUSTER_MAP_NAME = "__vertx.haInfo"
  * 
- * @author Leo Tu - leo.tu.taipei@gmail.com
+ * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
 public class RedisMapHaInfo extends RedisMap<String, String> {
 	private static final Logger log = LoggerFactory.getLogger(RedisMapHaInfo.class);

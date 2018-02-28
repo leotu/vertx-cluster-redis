@@ -38,7 +38,7 @@ import io.vertx.core.net.impl.ServerID;
 /**
  * Non Public API Utility
  * 
- * @author Leo Tu - leo.tu.taipei@gmail.com
+ * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
 public class NonPublicAPI {
 	// private static final Logger log = LoggerFactory.getLogger(NonPublicAPI.class);

@@ -27,7 +27,7 @@ import io.vertx.core.Vertx;
 
 /**
  *
- * @author Leo Tu - leo.tu.taipei@gmail.com
+ * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
 public class RedisMap<K, V> implements Map<K, V> {
 

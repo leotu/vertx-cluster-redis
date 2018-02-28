@@ -45,7 +45,7 @@ import io.vertx.core.spi.cluster.ChoosableIterable;
  * batch.atomic return's value must using Codec to Object. (always return String type)
  * 
  * @see org.redisson.RedissonSetMultimapValues
- * @author Leo Tu - leo.tu.taipei@gmail.com
+ * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
 public class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 	private static final Logger log = LoggerFactory.getLogger(RedisAsyncMultiMap.class);
