@@ -110,6 +110,10 @@ public class RedisClusterManager implements ClusterManager {
 		this.customRedissonClient = false;
 	}
 
+	public RedissonClient getRedisson() {
+		return redisson;
+	}
+
 	private void readyEventBus(ClusteredEventBus eventBus, RedisAsyncMultiMapSubs subs) {
 		// log.debug("...");
 		this.eventBus = eventBus;
@@ -184,6 +188,10 @@ public class RedisClusterManager implements ClusterManager {
 
 	@Override
 	public <K, V> void getAsyncMap(String name, Handler<AsyncResult<AsyncMap<K, V>>> resultHandler) {
+		if (name.equals(CLUSTER_MAP_NAME)) {
+			log.error("name cann't be \"{}\"", name);
+			resultHandler.handle(Future.failedFuture(new IllegalArgumentException("name cann't be \"" + name + "\"")));
+		}
 		vertx.executeBlocking(future -> {
 			future.complete(new RedisAsyncMap<K, V>(vertx, redisson, name));
 		}, resultHandler);

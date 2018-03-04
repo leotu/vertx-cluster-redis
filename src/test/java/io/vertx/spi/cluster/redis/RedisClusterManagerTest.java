@@ -41,7 +41,7 @@ import io.vertx.test.core.AsyncTestBase;
 
 /**
  * 
- * @author Leo Tu - leo.tu.taipei@gmail.com
+ * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
 public class RedisClusterManagerTest extends AsyncTestBase {
 	private static final Logger log;
