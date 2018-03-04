@@ -189,8 +189,8 @@ public class RedisClusterManager implements ClusterManager {
 	@Override
 	public <K, V> void getAsyncMap(String name, Handler<AsyncResult<AsyncMap<K, V>>> resultHandler) {
 		if (name.equals(CLUSTER_MAP_NAME)) {
-			log.error("name cann't be \"{}\"", name);
-			resultHandler.handle(Future.failedFuture(new IllegalArgumentException("name cann't be \"" + name + "\"")));
+			log.error("name cannot be \"{}\"", name);
+			resultHandler.handle(Future.failedFuture(new IllegalArgumentException("name cannot be \"" + name + "\"")));
 		}
 		vertx.executeBlocking(future -> {
 			future.complete(new RedisAsyncMap<K, V>(vertx, redisson, name));

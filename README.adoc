@@ -2,6 +2,5 @@
 
 This is a cluster manager implementation for Vert.x that uses https://github.com/redisson/redisson/[Redisson].
 
-Please see the in-source asciidoc documentation or the main documentation on the web-site for a full description
-of this component:
+https://github.com/leotu/vertx-cluster-redis
 

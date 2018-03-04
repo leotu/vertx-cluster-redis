@@ -41,13 +41,15 @@ import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
 import io.vertx.core.shareddata.AsyncMap;
+import io.vertx.spi.cluster.redis.ExpirableAsync;
 import io.vertx.spi.cluster.redis.NonPublicAPI.Reflection;
 
 /**
  *
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
-public class RedisAsyncMap<K, V> implements AsyncMap<K, V> {
+public class RedisAsyncMap<K, V> implements AsyncMap<K, V>, ExpirableAsync<K> {
+
 	protected final RedisStrictCommand<Long> ZSCORE_LONG = new RedisStrictCommand<Long>("ZSCORE",
 			new LongReplayConvertor()); // RedisCommands.ZSCORE
 
@@ -161,12 +163,11 @@ public class RedisAsyncMap<K, V> implements AsyncMap<K, V> {
 	}
 
 	/**
-	 * Remaining time to live (Non Standard Vertx's API)
-	 * 
 	 * @return TTL in milliseconds
 	 * @see org.redisson.RedissonMapCache#getTimeoutSetNameByKey
 	 * @see org.redisson.RedissonObject#encodeMapKey
 	 */
+	@Override
 	public void getTTL(K k, Handler<AsyncResult<Long>> resultHandler) {
 		// final String key = "redisson__timeout__set:{" + name + "}"; // XXX
 		final String key = Reflection.callMethod(map, RedissonMapCache.class, "getTimeoutSetNameByKey",
