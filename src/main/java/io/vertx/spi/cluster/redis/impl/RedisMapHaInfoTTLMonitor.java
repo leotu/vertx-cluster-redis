@@ -58,6 +58,7 @@ class RedisMapHaInfoTTLMonitor {
 	static private boolean debug = false;
 
 	private int refreshIntervalSeconds = 5;
+
 	private final ConcurrentMap<String, Long> resetTTL = new ConcurrentHashMap<>();// <nodeId, Timer ID>
 	private final Vertx vertx;
 	private final RedisClusterManager clusterManager;
@@ -177,7 +178,11 @@ class RedisMapHaInfoTTLMonitor {
 	protected void resetHaInfoTTL() {
 		String nodeId = clusterManager.getNodeID();
 		if (debug) {
-			log.debug("nodeId={}, resetTTL={}", nodeId, resetTTL);
+			log.debug("redisMapHaInfo.timeToLiveSeconds={}, nodeId={}, resetTTL={}", redisMapHaInfo.getTimeToLiveSeconds(),
+					nodeId, resetTTL);
+		}
+		if (redisMapHaInfo.getTimeToLiveSeconds() <= 0) {
+			return;
 		}
 		resetTTL.computeIfAbsent(nodeId, key -> {
 			int nodeTTL = redisMapHaInfo.getTimeToLiveSeconds();

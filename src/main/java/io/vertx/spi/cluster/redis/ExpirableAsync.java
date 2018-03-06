@@ -15,6 +15,8 @@
  */
 package io.vertx.spi.cluster.redis;
 
+import java.util.concurrent.TimeUnit;
+
 import io.vertx.core.AsyncResult;
 import io.vertx.core.Handler;
 
@@ -31,4 +33,13 @@ public interface ExpirableAsync<K> {
 	 * @return TTL in milliseconds
 	 */
 	void getTTL(K k, Handler<AsyncResult<Long>> resultHandler);
+
+	/**
+	 * Refresh TTL if present. Only update elements that already exist. Never add elements.
+	 * 
+	 * @return The number of elements added to the sorted sets, not including elements already existing for which the
+	 *         score was updated
+	 */
+	void refreshIfPresent(K k, long timeToLive, TimeUnit timeUnit, Handler<AsyncResult<Long>> resultHandler);
+
 }

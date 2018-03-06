@@ -40,7 +40,7 @@ import io.vertx.spi.cluster.redis.impl.RedisAsyncMultiMapSubs;
 class PendingMessageProcessor {
 	private static final Logger log = LoggerFactory.getLogger(PendingMessageProcessor.class);
 
-	static private boolean debug = true;
+	static private boolean debug = false;
 
 	final static private String HA_ORIGINAL_SERVER_ID_KEY = "_HA_ORIGINAL_SERVER_ID";
 	final static private String HA_RESEND_SERVER_ID_KEY = "_HA_RESEND_SERVER_ID";

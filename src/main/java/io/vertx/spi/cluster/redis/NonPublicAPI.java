@@ -19,10 +19,14 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
+
+import org.slf4j.Logger;
 
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
@@ -274,6 +278,58 @@ public class NonPublicAPI {
 				Throwable t = e.getCause() != null && e instanceof InvocationTargetException ? e.getCause() : e;
 				throw new RuntimeException(methodName, t);
 			}
+		}
+
+		/**
+		 * @param reflectObj may be null.
+		 */
+		static public <T> T callMethod(Object reflectObj, Method method, Object[] argsValues) {
+			if (method == null) {
+				throw new IllegalArgumentException("(method == null)");
+			}
+			if (method.getParameterTypes().length != argsValues.length) {
+				throw new IllegalArgumentException(
+						"(method.getParameterTypes().length != argsValues.length), method.parameterTypes.length="
+								+ method.getParameterTypes().length + ", argsValues.length=" + argsValues.length);
+			}
+			try {
+				boolean keepStatus = method.isAccessible();
+				if (!keepStatus) {
+					method.setAccessible(true);
+				}
+				try {
+					@SuppressWarnings("unchecked")
+					T obj = (T) method.invoke(reflectObj, argsValues);
+					return obj;
+				} finally {
+					method.setAccessible(keepStatus);
+				}
+			} catch (Exception e) {
+				Throwable t = e.getCause() != null && e instanceof InvocationTargetException ? e.getCause() : e;
+				throw new RuntimeException(method.getName(), t);
+			}
+		}
+
+		static public void listMethod(Class<?> clsObj, Logger log) {
+			if (clsObj == null) {
+				throw new IllegalArgumentException("(clsObj == null)");
+			}
+			Method[] methods = clsObj.getDeclaredMethods(); // getMethods();
+			for (int i = 0; i < methods.length; i++) {
+				log.debug("methods[" + i + "], getName=[" + methods[i].getName() + "], toString=[" + methods[i].toString()
+						+ "], isAccessible=[" + methods[i].isAccessible() + "]");
+			}
+		}
+
+		static public Method[] getMethod(Class<?> clsObj, String methodName) {
+			Method[] methods = clsObj.getDeclaredMethods();
+			List<Method> findMethods = new ArrayList<>();
+			for (Method method : methods) {
+				if (method.getName().equals(methodName)) {
+					findMethods.add(method);
+				}
+			}
+			return findMethods.toArray(new Method[0]);
 		}
 	}
 

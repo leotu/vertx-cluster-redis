@@ -39,14 +39,19 @@ public class RedisMapHaInfo extends RedisMap<String, String> {
 	private int timeToLiveSeconds = 10; // default TTL seconds
 
 	private final RedisClusterManager clusterManager;
-	private final RMapCache<String, String> mapAsync;
+	private RMapCache<String, String> mapAsync;
 	private final RedisMapHaInfoTTLMonitor ttlMonitor;
 
 	public RedisMapHaInfo(Vertx vertx, RedisClusterManager clusterManager, RedissonClient redisson, String name) {
-		super(vertx, redisson.getMapCache(name));
+		super(vertx, redisson, name);
 		this.clusterManager = clusterManager;
-		this.mapAsync = (RMapCache<String, String>) map;
 		this.ttlMonitor = new RedisMapHaInfoTTLMonitor(vertx, this.clusterManager, redisson, this);
+	}
+
+	@Override
+	protected RMapCache<String, String> createMap(RedissonClient redisson, String name) {
+		this.mapAsync = redisson.getMapCache(name);
+		return this.mapAsync;
 	}
 
 	protected RMapCache<String, String> getMapAsync() {
@@ -57,6 +62,17 @@ public class RedisMapHaInfo extends RedisMap<String, String> {
 		return timeToLiveSeconds;
 	}
 
+	/**
+	 * @see #setTimeToLiveSeconds
+	 */
+	public void disableTTL() {
+		setTimeToLiveSeconds(0);
+	}
+
+	/**
+	 * 
+	 * @param timeToLiveSeconds disable when value <= 0
+	 */
 	public void setTimeToLiveSeconds(int timeToLiveSeconds) {
 		this.timeToLiveSeconds = timeToLiveSeconds;
 	}
@@ -75,7 +91,8 @@ public class RedisMapHaInfo extends RedisMap<String, String> {
 	@Override
 	public String put(String key, String value) {
 		try {
-			return mapAsync.put(key, value, timeToLiveSeconds, TimeUnit.SECONDS);
+			return timeToLiveSeconds > 0 ? mapAsync.put(key, value, timeToLiveSeconds, TimeUnit.SECONDS)
+					: super.put(key, value);
 		} catch (Exception ignore) {
 			String previous = super.put(key, value);
 			log.warn("retry without TTL: key: {}, value: {}, previous: {}, timeToLiveSeconds: {}, error: {}", key, value,

@@ -174,6 +174,9 @@ public class RedisClusterManager implements ClusterManager {
 	@SuppressWarnings("unchecked")
 	@Override
 	public <K, V> void getAsyncMultiMap(String name, Handler<AsyncResult<AsyncMultiMap<K, V>>> resultHandler) {
+		if (debug) {
+			log.debug("name: {}", name);
+		}
 		vertx.executeBlocking(future -> {
 			if (name.equals(SUBS_MAP_NAME)) {
 				subs = new RedisAsyncMultiMapSubs(vertx, this, redisson, name);
@@ -188,6 +191,9 @@ public class RedisClusterManager implements ClusterManager {
 
 	@Override
 	public <K, V> void getAsyncMap(String name, Handler<AsyncResult<AsyncMap<K, V>>> resultHandler) {
+		if (debug) {
+			log.debug("name: {}", name);
+		}
 		if (name.equals(CLUSTER_MAP_NAME)) {
 			log.error("name cannot be \"{}\"", name);
 			resultHandler.handle(Future.failedFuture(new IllegalArgumentException("name cannot be \"" + name + "\"")));
@@ -203,8 +209,12 @@ public class RedisClusterManager implements ClusterManager {
 	@SuppressWarnings("unchecked")
 	@Override
 	public <K, V> Map<K, V> getSyncMap(String name) {
+		if (debug) {
+			log.debug("name: {}", name);
+		}
 		if (name.equals(CLUSTER_MAP_NAME)) {
 			haInfo = new RedisMapHaInfo(vertx, this, redisson, name);
+			haInfo.disableTTL(); // XXX
 			return (Map<K, V>) haInfo;
 		} else {
 			return new RedisMap<K, V>(vertx, redisson, name);
@@ -213,6 +223,9 @@ public class RedisClusterManager implements ClusterManager {
 
 	@Override
 	public void getLockWithTimeout(String name, long timeout, Handler<AsyncResult<Lock>> resultHandler) {
+		if (debug) {
+			log.debug("name: {}, timeout: {}", name, timeout);
+		}
 		try {
 			RLock lock = redisson.getLock(name); // getFairLock ?
 			lock.tryLockAsync(timeout, TimeUnit.MILLISECONDS).whenComplete((v, e) -> resultHandler
@@ -225,6 +238,9 @@ public class RedisClusterManager implements ClusterManager {
 
 	@Override
 	public void getCounter(String name, Handler<AsyncResult<Counter>> resultHandler) {
+		if (debug) {
+			log.debug("name: {}", name);
+		}
 		try {
 			RAtomicLong counter = redisson.getAtomicLong(name);
 			resultHandler.handle(Future.succeededFuture(new RedisCounter(counter)));

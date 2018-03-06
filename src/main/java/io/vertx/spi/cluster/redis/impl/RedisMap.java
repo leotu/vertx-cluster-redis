@@ -34,17 +34,26 @@ public class RedisMap<K, V> implements Map<K, V> {
 	protected final Vertx vertx;
 	protected final RMap<K, V> map;
 
-	public RedisMap(Vertx vertx, RMap<K, V> map) {
-		Objects.requireNonNull(map, "map");
-		this.vertx = vertx;
-		this.map = map;
-	}
+	// public RedisMap(Vertx vertx, RMap<K, V> map) {
+	// Objects.requireNonNull(map, "map");
+	// this.vertx = vertx;
+	// this.map = map;
+	// }
 
 	public RedisMap(Vertx vertx, RedissonClient redisson, String name) {
 		Objects.requireNonNull(redisson, "redisson");
 		Objects.requireNonNull(name, "name");
 		this.vertx = vertx;
-		this.map = redisson.getMap(name);
+		this.map = createMap(redisson, name);
+	}
+
+	/**
+	 * Here you can customize(override method) a "Codec"
+	 * 
+	 * @see org.redisson.codec.JsonJacksonCodec
+	 */
+	protected RMap<K, V> createMap(RedissonClient redisson, String name) {
+		return redisson.getMap(name);
 	}
 
 	@Override
