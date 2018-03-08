@@ -29,10 +29,11 @@ import io.vertx.core.eventbus.impl.clustered.ClusteredMessage;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.net.impl.ServerID;
+import io.vertx.core.spi.cluster.AsyncMultiMap;
 import io.vertx.core.spi.cluster.ChoosableIterable;
+import io.vertx.core.spi.cluster.ClusterManager;
 import io.vertx.spi.cluster.redis.NonPublicAPI.ClusteredEventBusAPI;
 import io.vertx.spi.cluster.redis.NonPublicAPI.ClusteredEventBusAPI.ConnectionHolderAPI;
-import io.vertx.spi.cluster.redis.impl.RedisAsyncMultiMapSubs;
 
 /**
  * Tryable to choose another server ID
@@ -51,12 +52,12 @@ class PendingMessageProcessor {
 	private final ClusteredEventBus eventBus;
 	private final Context sendNoContext;
 	private final ServerID clusterServerID; // self, local server
-	private final RedisAsyncMultiMapSubs subs;
-	private final RedisClusterManager clusterManager;
+	private final AsyncMultiMap<String, ClusterNodeInfo> subs;
+	private final ClusterManager clusterManager;
 	private final ConcurrentMap<ServerID, Object> connections; // <ServerID, ConnectionHolder>
 
-	public PendingMessageProcessor(Vertx vertx, RedisClusterManager clusterManager, ClusteredEventBus eventBus,
-			RedisAsyncMultiMapSubs subs, ConcurrentMap<ServerID, Object> connections) {
+	public PendingMessageProcessor(Vertx vertx, ClusterManager clusterManager, ClusteredEventBus eventBus,
+			AsyncMultiMap<String, ClusterNodeInfo> subs, ConcurrentMap<ServerID, Object> connections) {
 		this.clusterManager = clusterManager;
 		this.eventBus = eventBus;
 		this.subs = subs;

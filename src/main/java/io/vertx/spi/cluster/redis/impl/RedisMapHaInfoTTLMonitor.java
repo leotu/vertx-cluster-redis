@@ -40,10 +40,10 @@ import io.vertx.core.json.JsonObject;
 //import org.slf4j.LoggerFactory;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
+import io.vertx.core.spi.cluster.ClusterManager;
 import io.vertx.core.spi.cluster.NodeListener;
 import io.vertx.spi.cluster.redis.NonPublicAPI;
 import io.vertx.spi.cluster.redis.NonPublicAPI.ClusteredEventBusAPI;
-import io.vertx.spi.cluster.redis.RedisClusterManager;
 
 /**
  * TTL: "__vertx.haInfo"
@@ -61,7 +61,7 @@ class RedisMapHaInfoTTLMonitor {
 
 	private final ConcurrentMap<String, Long> resetTTL = new ConcurrentHashMap<>();// <nodeId, Timer ID>
 	private final Vertx vertx;
-	private final RedisClusterManager clusterManager;
+	private final ClusterManager clusterManager;
 	private final RedisMapHaInfo redisMapHaInfo;
 	private final RMapCache<String, String> mapAsync;
 
@@ -75,7 +75,7 @@ class RedisMapHaInfoTTLMonitor {
 	private boolean syncSubs = false;
 	private final AtomicReference<Date> faultTimeMaker = new AtomicReference<>();
 
-	public RedisMapHaInfoTTLMonitor(Vertx vertx, RedisClusterManager clusterManager, RedissonClient redisson,
+	public RedisMapHaInfoTTLMonitor(Vertx vertx, ClusterManager clusterManager, RedissonClient redisson,
 			RedisMapHaInfo redisMapHaInfo) {
 		Objects.requireNonNull(redisson, "redisson");
 		Objects.requireNonNull(redisMapHaInfo, "redisMapHaInfo");
@@ -218,7 +218,8 @@ class RedisMapHaInfoTTLMonitor {
 	 * newOne will fire EntryCreatedListener(...)
 	 */
 	private void refreshAction(String nodeId) {
-		JsonObject haInfo = ClusteredEventBusAPI.haInfo(ClusteredEventBusAPI.haManager(clusterManager.getEventBus()));
+		JsonObject haInfo = ClusteredEventBusAPI
+				.haInfo(ClusteredEventBusAPI.haManager(ClusteredEventBusAPI.eventBus(vertx)));
 		if (haInfo == null) {
 			log.warn("(haInfo == null)");
 			return;
@@ -299,7 +300,7 @@ class RedisMapHaInfoTTLMonitor {
 			if (debug) {
 				log.debug("call addHaInfoIfLost(...), nodeId={}, haInfo={}", nodeId, haInfo);
 			}
-			NonPublicAPI.addHaInfoIfLost(ClusteredEventBusAPI.haManager(clusterManager.getEventBus()), nodeId); // XXX
+			NonPublicAPI.addHaInfoIfLost(ClusteredEventBusAPI.haManager(ClusteredEventBusAPI.eventBus(vertx)), nodeId); // XXX
 		}
 
 		if (faultTime != null && haInfo != null) {

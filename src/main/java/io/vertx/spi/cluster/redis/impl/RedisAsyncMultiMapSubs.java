@@ -36,8 +36,8 @@ import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.shareddata.Lock;
 import io.vertx.core.spi.cluster.ChoosableIterable;
+import io.vertx.core.spi.cluster.ClusterManager;
 import io.vertx.spi.cluster.redis.AsyncLocalLock;
-import io.vertx.spi.cluster.redis.RedisClusterManager;
 
 /**
  * SUBS_MAP_NAME = "__vertx.subs"
@@ -54,9 +54,9 @@ public class RedisAsyncMultiMapSubs extends RedisAsyncMultiMap<String, ClusterNo
 
 	static private boolean debug = false;
 
-	private final RedisClusterManager clusterManager;
+	private final ClusterManager clusterManager;
 
-	public RedisAsyncMultiMapSubs(Vertx vertx, RedisClusterManager clusterManager, RedissonClient redisson, String name) {
+	public RedisAsyncMultiMapSubs(Vertx vertx, ClusterManager clusterManager, RedissonClient redisson, String name) {
 		super(vertx, redisson, name);
 		this.clusterManager = clusterManager;
 	}
@@ -244,6 +244,7 @@ public class RedisAsyncMultiMapSubs extends RedisAsyncMultiMap<String, ClusterNo
 		}
 	}
 
+	@Deprecated
 	private void releaseLock(List<io.vertx.core.shareddata.Lock> lockList) {
 		lockList.forEach(lock -> {
 			AsyncLocalLock.releaseLock(lock);

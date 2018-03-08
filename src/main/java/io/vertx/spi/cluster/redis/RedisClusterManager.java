@@ -36,6 +36,7 @@ import io.vertx.core.AsyncResult;
 import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
+import io.vertx.core.eventbus.impl.clustered.ClusterNodeInfo;
 import io.vertx.core.eventbus.impl.clustered.ClusteredEventBus;
 import io.vertx.core.eventbus.impl.clustered.ClusteredMessage;
 import io.vertx.core.json.JsonObject;
@@ -52,6 +53,8 @@ import io.vertx.core.spi.cluster.ClusterManager;
 import io.vertx.core.spi.cluster.NodeListener;
 import io.vertx.spi.cluster.redis.NonPublicAPI.ClusteredEventBusAPI;
 import io.vertx.spi.cluster.redis.NonPublicAPI.ClusteredEventBusAPI.ConnectionHolderAPI;
+import io.vertx.spi.cluster.redis.NonPublicAPI.LocalCached;
+import io.vertx.spi.cluster.redis.impl.LocalCachedAsyncMultiMap;
 import io.vertx.spi.cluster.redis.impl.RedisAsyncMap;
 import io.vertx.spi.cluster.redis.impl.RedisAsyncMultiMap;
 import io.vertx.spi.cluster.redis.impl.RedisAsyncMultiMapSubs;
@@ -80,7 +83,10 @@ public class RedisClusterManager implements ClusterManager {
 	private NodeListener nodeListener;
 
 	private RedisMapHaInfo haInfo;
-	private RedisAsyncMultiMapSubs subs;
+	private AsyncMultiMap<String, ClusterNodeInfo> subs;
+	private boolean cacheSubs = true;
+	private String cacheSubsTopicName = "cacheSubsTopic";
+	private final int cacheSubsTimeoutInSecoinds = 15;
 
 	private static final String CLUSTER_MAP_NAME = NonPublicAPI.HA_CLUSTER_MAP_NAME;
 	private static final String SUBS_MAP_NAME = NonPublicAPI.EB_SUBS_MAP_NAME;
@@ -114,7 +120,7 @@ public class RedisClusterManager implements ClusterManager {
 		return redisson;
 	}
 
-	private void readyEventBus(ClusteredEventBus eventBus, RedisAsyncMultiMapSubs subs) {
+	private void readyEventBus(ClusteredEventBus eventBus, AsyncMultiMap<String, ClusterNodeInfo> subs) {
 		// log.debug("...");
 		this.eventBus = eventBus;
 
@@ -160,10 +166,6 @@ public class RedisClusterManager implements ClusterManager {
 		}
 	}
 
-	public ClusteredEventBus getEventBus() {
-		return eventBus;
-	}
-
 	/**
 	 * (1)
 	 */
@@ -178,15 +180,22 @@ public class RedisClusterManager implements ClusterManager {
 	@SuppressWarnings("unchecked")
 	@Override
 	public <K, V> void getAsyncMultiMap(String name, Handler<AsyncResult<AsyncMultiMap<K, V>>> resultHandler) {
-		if (debug) {
-			log.debug("name: {}", name);
-		}
 		vertx.executeBlocking(future -> {
 			if (name.equals(SUBS_MAP_NAME)) {
 				subs = new RedisAsyncMultiMapSubs(vertx, this, redisson, name);
+				if (cacheSubs) {
+					subs = new LocalCachedAsyncMultiMap<String, ClusterNodeInfo>(vertx, this, redisson, subs,
+							cacheSubsTimeoutInSecoinds, cacheSubsTopicName);
+					if (debug) {
+						log.debug("name: {}, cacheSubs: {}, subs: {}", name, cacheSubs, subs);
+					}
+				}
 				readyEventBus(ClusteredEventBusAPI.eventBus(vertx), subs);
 				future.complete((AsyncMultiMap<K, V>) subs);
 			} else {
+				if (debug) {
+					log.debug("name: {}", name);
+				}
 				future.complete(new RedisAsyncMultiMap<K, V>(vertx, redisson, name));
 			}
 
@@ -267,6 +276,15 @@ public class RedisClusterManager implements ClusterManager {
 		return haInfo.keySet().stream().map(e -> e.toString()).collect(Collectors.toList());
 	}
 
+	private void clearLocalCached() {
+		if (subs != null && subs instanceof LocalCached) {
+			if (debug) {
+				log.debug("...");
+			}
+			((LocalCached) subs).clearAll();
+		}
+	}
+
 	/**
 	 * (4)
 	 * 
@@ -278,6 +296,7 @@ public class RedisClusterManager implements ClusterManager {
 		this.nodeListener = new NodeListener() {
 			@Override
 			synchronized public void nodeAdded(String nodeId) {
+				clearLocalCached();
 				// if (isActive()) {
 				nodeListener.nodeAdded(nodeId);
 				// } else {
@@ -290,6 +309,7 @@ public class RedisClusterManager implements ClusterManager {
 			 */
 			@Override
 			synchronized public void nodeLeft(String nodeId) {
+				clearLocalCached();
 				// if (isActive()) {
 				nodeListener.nodeLeft(nodeId);
 				// } else {
@@ -316,6 +336,7 @@ public class RedisClusterManager implements ClusterManager {
 				future.fail(new IllegalStateException("Already activated"));
 			} else {
 				active = true;
+				clearLocalCached();
 				future.complete();
 			}
 		}, resultHandler);
@@ -340,6 +361,7 @@ public class RedisClusterManager implements ClusterManager {
 					active = false;
 					try {
 						nodeListener = null;
+						clearLocalCached();
 						future.complete();
 					} catch (Exception e) {
 						future.fail(e);

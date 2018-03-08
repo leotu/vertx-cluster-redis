@@ -60,6 +60,10 @@ public class NonPublicAPI {
 		EB_SUBS_MAP_NAME = Reflection.getStaticFinalField(ClusteredEventBus.class, "SUBS_MAP_NAME");
 	}
 
+	static public interface LocalCached {
+		void clearAll();
+	}
+
 	/**
 	 * FIX: Non Vert.x thread
 	 */

@@ -34,12 +34,6 @@ public class RedisMap<K, V> implements Map<K, V> {
 	protected final Vertx vertx;
 	protected final RMap<K, V> map;
 
-	// public RedisMap(Vertx vertx, RMap<K, V> map) {
-	// Objects.requireNonNull(map, "map");
-	// this.vertx = vertx;
-	// this.map = map;
-	// }
-
 	public RedisMap(Vertx vertx, RedissonClient redisson, String name) {
 		Objects.requireNonNull(redisson, "redisson");
 		Objects.requireNonNull(name, "name");

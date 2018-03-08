@@ -19,14 +19,15 @@ import java.util.concurrent.TimeUnit;
 
 import org.redisson.api.RMapCache;
 import org.redisson.api.RedissonClient;
+import org.redisson.client.codec.StringCodec;
 
 import io.vertx.core.Vertx;
 //import org.slf4j.Logger;
 //import org.slf4j.LoggerFactory;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
+import io.vertx.core.spi.cluster.ClusterManager;
 import io.vertx.core.spi.cluster.NodeListener;
-import io.vertx.spi.cluster.redis.RedisClusterManager;
 
 /**
  * CLUSTER_MAP_NAME = "__vertx.haInfo"
@@ -38,19 +39,24 @@ public class RedisMapHaInfo extends RedisMap<String, String> {
 
 	private int timeToLiveSeconds = 10; // default TTL seconds
 
-	private final RedisClusterManager clusterManager;
+	private final ClusterManager clusterManager;
 	private RMapCache<String, String> mapAsync;
 	private final RedisMapHaInfoTTLMonitor ttlMonitor;
 
-	public RedisMapHaInfo(Vertx vertx, RedisClusterManager clusterManager, RedissonClient redisson, String name) {
+	public RedisMapHaInfo(Vertx vertx, ClusterManager clusterManager, RedissonClient redisson, String name) {
 		super(vertx, redisson, name);
 		this.clusterManager = clusterManager;
 		this.ttlMonitor = new RedisMapHaInfoTTLMonitor(vertx, this.clusterManager, redisson, this);
 	}
 
+	/**
+	 * @see org.redisson.codec.JsonJacksonCodec
+	 * @see org.redisson.client.codec.JsonJacksonMapCodec
+	 */
 	@Override
 	protected RMapCache<String, String> createMap(RedissonClient redisson, String name) {
-		this.mapAsync = redisson.getMapCache(name);
+		this.mapAsync = redisson.getMapCache(name, new StringCodec());
+		// log.debug("mapAsync.codec.class={}", mapAsync.getCodec().getClass().getName());
 		return this.mapAsync;
 	}
 
