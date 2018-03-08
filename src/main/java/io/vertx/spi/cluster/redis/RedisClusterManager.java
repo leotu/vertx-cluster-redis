@@ -51,7 +51,7 @@ import io.vertx.core.spi.cluster.AsyncMultiMap;
 import io.vertx.core.spi.cluster.ClusterManager;
 import io.vertx.core.spi.cluster.NodeListener;
 import io.vertx.spi.cluster.redis.NonPublicAPI.ClusteredEventBusAPI;
-import io.vertx.spi.cluster.redis.NonPublicAPI.Reflection;
+import io.vertx.spi.cluster.redis.NonPublicAPI.ClusteredEventBusAPI.ConnectionHolderAPI;
 import io.vertx.spi.cluster.redis.impl.RedisAsyncMap;
 import io.vertx.spi.cluster.redis.impl.RedisAsyncMultiMap;
 import io.vertx.spi.cluster.redis.impl.RedisAsyncMultiMapSubs;
@@ -120,11 +120,11 @@ public class RedisClusterManager implements ClusterManager {
 
 		@SuppressWarnings("unchecked")
 		ConcurrentMap<ServerID, Object> oldOne = (ConcurrentMap<ServerID, Object>) ClusteredEventBusAPI
-				.getConnections(this.eventBus);
+				.connections(this.eventBus);
 		@SuppressWarnings("serial")
 		ConcurrentMap<ServerID, Object> newOne = new ConcurrentHashMap<ServerID, Object>() {
 			PendingMessageProcessor pendingProcessor = new PendingMessageProcessor(vertx, RedisClusterManager.this, eventBus,
-					subs);
+					subs, this);
 
 			/**
 			 * @param key is ServerID type
@@ -135,7 +135,11 @@ public class RedisClusterManager implements ClusterManager {
 			public boolean remove(Object serverID, Object connHolder) {
 				boolean ok = super.remove(serverID, connHolder);
 				if (ok) {
-					Queue<ClusteredMessage<?, ?>> pending = Reflection.getField(connHolder, connHolder.getClass(), "pending");
+					Queue<ClusteredMessage<?, ?>> pending = ConnectionHolderAPI.pending(connHolder);
+					ServerID holderServerID = ConnectionHolderAPI.serverID(connHolder);
+					if (!serverID.equals(holderServerID)) {
+						log.warn("(!serverID.equals(holderServerID), serverID: {}, holderServerID: {}", serverID, holderServerID);
+					}
 					if (pending != null && !pending.isEmpty()) {
 						pendingProcessor.run((ServerID) serverID, pending);
 					}
@@ -180,7 +184,7 @@ public class RedisClusterManager implements ClusterManager {
 		vertx.executeBlocking(future -> {
 			if (name.equals(SUBS_MAP_NAME)) {
 				subs = new RedisAsyncMultiMapSubs(vertx, this, redisson, name);
-				readyEventBus(ClusteredEventBusAPI.getEventBus(vertx), subs);
+				readyEventBus(ClusteredEventBusAPI.eventBus(vertx), subs);
 				future.complete((AsyncMultiMap<K, V>) subs);
 			} else {
 				future.complete(new RedisAsyncMultiMap<K, V>(vertx, redisson, name));

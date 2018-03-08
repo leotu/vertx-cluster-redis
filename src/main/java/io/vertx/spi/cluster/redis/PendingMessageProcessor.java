@@ -17,6 +17,7 @@ package io.vertx.spi.cluster.redis;
 
 import java.util.Objects;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentMap;
 
 import io.vertx.core.AsyncResult;
 import io.vertx.core.Context;
@@ -30,6 +31,7 @@ import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.net.impl.ServerID;
 import io.vertx.core.spi.cluster.ChoosableIterable;
 import io.vertx.spi.cluster.redis.NonPublicAPI.ClusteredEventBusAPI;
+import io.vertx.spi.cluster.redis.NonPublicAPI.ClusteredEventBusAPI.ConnectionHolderAPI;
 import io.vertx.spi.cluster.redis.impl.RedisAsyncMultiMapSubs;
 
 /**
@@ -48,17 +50,19 @@ class PendingMessageProcessor {
 
 	private final ClusteredEventBus eventBus;
 	private final Context sendNoContext;
-	private final ServerID selfServerID; // self
+	private final ServerID clusterServerID; // self, local server
 	private final RedisAsyncMultiMapSubs subs;
 	private final RedisClusterManager clusterManager;
+	private final ConcurrentMap<ServerID, Object> connections; // <ServerID, ConnectionHolder>
 
 	public PendingMessageProcessor(Vertx vertx, RedisClusterManager clusterManager, ClusteredEventBus eventBus,
-			RedisAsyncMultiMapSubs subs) {
+			RedisAsyncMultiMapSubs subs, ConcurrentMap<ServerID, Object> connections) {
 		this.clusterManager = clusterManager;
 		this.eventBus = eventBus;
 		this.subs = subs;
 		this.sendNoContext = vertx.getOrCreateContext();
-		this.selfServerID = ClusteredEventBusAPI.getServerID(eventBus);
+		this.clusterServerID = ClusteredEventBusAPI.serverID(eventBus);
+		this.connections = connections;
 	}
 
 	/**
@@ -146,33 +150,56 @@ class PendingMessageProcessor {
 	 */
 	private <T> void resendToSubs(ServerID failedServerID, ClusteredMessage<?, ?> message,
 			ChoosableIterable<ClusterNodeInfo> subs) {
-		// Choose one
 		ClusterNodeInfo ci = subs.choose();
-		ServerID sid = null;
+		ServerID choosedServerID = null;
+		ServerID pendingServerID = null;
+		ServerID localServerID = null;
 		while ((ci = subs.choose()) != null) {
-			sid = ci.serverID;
-			if (!sid.equals(failedServerID) && !sid.equals(selfServerID)) {
-				break;
+			ServerID sid = ci.serverID;
+			if (!sid.equals(failedServerID) && !sid.equals(clusterServerID)) {
+				Object connHolder = connections.get(sid);
+				if (connHolder == null) {
+					choosedServerID = sid;
+					break;
+				} else {
+					Queue<ClusteredMessage<?, ?>> pending = ConnectionHolderAPI.pending(connHolder);
+					ServerID holderServerID = ConnectionHolderAPI.serverID(connHolder);
+					if (!sid.equals(holderServerID)) {
+						log.warn("(!sid.equals(holderServerID), sid: {}, holderServerID: {}", sid, holderServerID);
+					}
+					if (pending == null || pending.isEmpty()) {
+						choosedServerID = sid;
+						break;
+					} else if (pending != null) {
+						pendingServerID = sid;
+						log.debug("skip pendingServerID: {}, pending.size: {}", pendingServerID, pending.size());
+					}
+				}
+			} else if (sid.equals(clusterServerID)) {
+				localServerID = sid;
 			}
 		}
-		if (sid == null) {
-			log.info("new one not found and return to failed server again: {}, address: {}", failedServerID,
+		if (choosedServerID == null) {
+			choosedServerID = pendingServerID != null ? pendingServerID : failedServerID;
+			if (choosedServerID.equals(failedServerID) && localServerID != null) {
+				// FIXME: change to localServerID ?
+			}
+			log.info("new one not found, return to failed or pending server: {}, address: {}", choosedServerID,
 					message.address());
-			sid = failedServerID;
 		} else {
-			log.info("switch to new server: {}, previous failed server: {}, address: {}", sid, failedServerID,
+			log.info("switch to new server: {}, previous failed server: {}, address: {}", choosedServerID, failedServerID,
 					message.address());
 		}
 
 		String originalServerId = message.headers().get(HA_ORIGINAL_SERVER_ID_KEY);
 		if (originalServerId == null) {
 			message.headers().set(HA_ORIGINAL_SERVER_ID_KEY, failedServerID.toString());
-			message.headers().set(HA_RESEND_SERVER_ID_KEY, sid.toString());
+			message.headers().set(HA_RESEND_SERVER_ID_KEY, choosedServerID.toString());
 		} else {
 			message.headers().set(HA_RESEND_SERVER_ID_KEY, failedServerID.toString());
-			message.headers().set(HA_RESEND_AGAIN_SERVER_ID_KEY, sid.toString());
+			message.headers().set(HA_RESEND_AGAIN_SERVER_ID_KEY, choosedServerID.toString());
 		}
-		ClusteredEventBusAPI.sendRemote(eventBus, sid, message);
+		ClusteredEventBusAPI.sendRemote(eventBus, choosedServerID, message);
 	}
 
 }

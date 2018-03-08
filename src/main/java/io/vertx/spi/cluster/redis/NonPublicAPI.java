@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
 
@@ -93,38 +94,71 @@ public class NonPublicAPI {
 	 * @see HAManager#addHaInfoIfLost
 	 */
 	public static void addHaInfoIfLost(HAManager haManager, String nodeId) {
-		final JsonObject haInfo = ClusteredEventBusAPI.getHaInfo(haManager);
-		final Map<String, String> clusterMap = HAManagerAPI.getClusterMap(haManager);
+		final JsonObject haInfo = ClusteredEventBusAPI.haInfo(haManager);
+		final Map<String, String> clusterMap = HAManagerAPI.clusterMap(haManager);
 		clusterMap.put(nodeId, haInfo.encode());
 	}
 
 	protected static class HAManagerAPI {
-		public static Map<String, String> getClusterMap(HAManager haManager) {
+		public static Map<String, String> clusterMap(HAManager haManager) {
 			return Reflection.getFinalField(haManager, HAManager.class, "clusterMap");
 		}
 	}
 
+	/**
+	 * @see io.vertx.core.eventbus.impl.clustered.ClusteredEventBus
+	 */
 	public static class ClusteredEventBusAPI {
 
-		public static ClusteredEventBus getEventBus(Vertx vertx) {
+		public static ClusteredEventBus eventBus(Vertx vertx) {
 			return (ClusteredEventBus) vertx.eventBus();
 		}
 
-		public static HAManager getHAManager(ClusteredEventBus eventBus) {
+		public static HAManager haManager(ClusteredEventBus eventBus) {
 			return Reflection.getFinalField(eventBus, ClusteredEventBus.class, "haManager");
 		}
 
 		/**
 		 * self
 		 */
-		public static ServerID getServerID(ClusteredEventBus eventBus) {
+		public static ServerID serverID(ClusteredEventBus eventBus) {
 			return ReflectUtil.getFinalField(eventBus, ClusteredEventBus.class, "serverID");
+		}
+
+		/**
+		 * @see io.vertx.core.eventbus.impl.clustered.ConnectionHolder
+		 */
+		public static class ConnectionHolderAPI {
+
+			/**
+			 * ConnectionHolder's pending
+			 */
+			public static Queue<ClusteredMessage<?, ?>> pending(Object connHolder) {
+				if (!connHolder.getClass().getName().equals("io.vertx.core.eventbus.impl.clustered.ConnectionHolder")) {
+					throw new IllegalArgumentException(
+							"Only support type: io.vertx.core.eventbus.impl.clustered.ConnectionHolder, but parameter's type is: "
+									+ connHolder.getClass().getName());
+				}
+				return Reflection.getField(connHolder, connHolder.getClass(), "pending");
+			}
+
+			/**
+			 * ConnectionHolder's serverID
+			 */
+			public static ServerID serverID(Object connHolder) {
+				if (!connHolder.getClass().getName().equals("io.vertx.core.eventbus.impl.clustered.ConnectionHolder")) {
+					throw new IllegalArgumentException(
+							"Only support type: io.vertx.core.eventbus.impl.clustered.ConnectionHolder, but parameter's type is: "
+									+ connHolder.getClass().getName());
+				}
+				return Reflection.getField(connHolder, connHolder.getClass(), "serverID");
+			}
 		}
 
 		/**
 		 * Local ConcurrentHashSet
 		 */
-		public static Set<String> getOwnSubs(ClusteredEventBus eventBus) {
+		public static Set<String> ownSubs(ClusteredEventBus eventBus) {
 			return Reflection.getField(eventBus, ClusteredEventBus.class, "ownSubs");
 		}
 
@@ -136,7 +170,7 @@ public class NonPublicAPI {
 					new Class[] { ServerID.class, MessageImpl.class }, new Object[] { serverID, message });
 		}
 
-		public static ClusterNodeInfo getNodeInfo(ClusteredEventBus eventBus) {
+		public static ClusterNodeInfo nodeInfo(ClusteredEventBus eventBus) {
 			return Reflection.getField(eventBus, ClusteredEventBus.class, "nodeInfo");
 		}
 
@@ -145,7 +179,7 @@ public class NonPublicAPI {
 		 * 
 		 * @see ClusteredEventBus#connections
 		 */
-		public static ConcurrentMap<ServerID, ?> getConnections(ClusteredEventBus eventBus) {
+		public static ConcurrentMap<ServerID, ?> connections(ClusteredEventBus eventBus) {
 			// return Reflection.getField(eventBus, ClusteredEventBus.class, "connections");
 			return Reflection.callMethod(eventBus, ClusteredEventBus.class, "connections");
 		}
@@ -154,7 +188,7 @@ public class NonPublicAPI {
 			Reflection.setFinalField(eventBus, ClusteredEventBus.class, "connections", connections);
 		}
 
-		public static JsonObject getHaInfo(HAManager haManager) {
+		public static JsonObject haInfo(HAManager haManager) {
 			return Reflection.getFinalField(haManager, HAManager.class, "haInfo");
 		}
 	}

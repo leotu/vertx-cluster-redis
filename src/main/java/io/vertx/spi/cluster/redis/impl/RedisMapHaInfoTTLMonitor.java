@@ -218,7 +218,7 @@ class RedisMapHaInfoTTLMonitor {
 	 * newOne will fire EntryCreatedListener(...)
 	 */
 	private void refreshAction(String nodeId) {
-		JsonObject haInfo = ClusteredEventBusAPI.getHaInfo(ClusteredEventBusAPI.getHAManager(clusterManager.getEventBus()));
+		JsonObject haInfo = ClusteredEventBusAPI.haInfo(ClusteredEventBusAPI.haManager(clusterManager.getEventBus()));
 		if (haInfo == null) {
 			log.warn("(haInfo == null)");
 			return;
@@ -299,7 +299,7 @@ class RedisMapHaInfoTTLMonitor {
 			if (debug) {
 				log.debug("call addHaInfoIfLost(...), nodeId={}, haInfo={}", nodeId, haInfo);
 			}
-			NonPublicAPI.addHaInfoIfLost(ClusteredEventBusAPI.getHAManager(clusterManager.getEventBus()), nodeId); // XXX
+			NonPublicAPI.addHaInfoIfLost(ClusteredEventBusAPI.haManager(clusterManager.getEventBus()), nodeId); // XXX
 		}
 
 		if (faultTime != null && haInfo != null) {
