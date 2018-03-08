@@ -37,16 +37,18 @@ import io.vertx.core.spi.cluster.NodeListener;
 public class RedisMapHaInfo extends RedisMap<String, String> {
 	private static final Logger log = LoggerFactory.getLogger(RedisMapHaInfo.class);
 
-	private int timeToLiveSeconds = 10; // default TTL seconds
+	private final int timeToLiveSeconds;
 
 	private final ClusterManager clusterManager;
 	private RMapCache<String, String> mapAsync;
 	private final RedisMapHaInfoTTLMonitor ttlMonitor;
 
-	public RedisMapHaInfo(Vertx vertx, ClusterManager clusterManager, RedissonClient redisson, String name) {
+	public RedisMapHaInfo(Vertx vertx, ClusterManager clusterManager, RedissonClient redisson, String name,
+			int timeToLiveSeconds, int refreshIntervalSeconds) {
 		super(vertx, redisson, name);
 		this.clusterManager = clusterManager;
-		this.ttlMonitor = new RedisMapHaInfoTTLMonitor(vertx, this.clusterManager, redisson, this);
+		this.timeToLiveSeconds = timeToLiveSeconds;
+		this.ttlMonitor = new RedisMapHaInfoTTLMonitor(vertx, this.clusterManager, redisson, this, refreshIntervalSeconds);
 	}
 
 	/**
@@ -68,20 +70,21 @@ public class RedisMapHaInfo extends RedisMap<String, String> {
 		return timeToLiveSeconds;
 	}
 
-	/**
-	 * @see #setTimeToLiveSeconds
-	 */
-	public void disableTTL() {
-		setTimeToLiveSeconds(0);
-	}
-
-	/**
-	 * 
-	 * @param timeToLiveSeconds disable when value <= 0
-	 */
-	public void setTimeToLiveSeconds(int timeToLiveSeconds) {
-		this.timeToLiveSeconds = timeToLiveSeconds;
-	}
+	// /**
+	// * @see #setTimeToLiveSeconds
+	// */
+	// public void disableTTL() {
+	// log.debug("...");
+	// setTimeToLiveSeconds(0);
+	// }
+	//
+	// /**
+	// *
+	// * @param timeToLiveSeconds disable when value <= 0
+	// */
+	// public void setTimeToLiveSeconds(int timeToLiveSeconds) {
+	// this.timeToLiveSeconds = timeToLiveSeconds;
+	// }
 
 	public void attachListener(NodeListener nodeListener) {
 		ttlMonitor.attachListener(nodeListener);

@@ -57,7 +57,7 @@ class RedisMapHaInfoTTLMonitor {
 
 	static private boolean debug = false;
 
-	private int refreshIntervalSeconds = 5;
+	final private int refreshIntervalSeconds;
 
 	private final ConcurrentMap<String, Long> resetTTL = new ConcurrentHashMap<>();// <nodeId, Timer ID>
 	private final Vertx vertx;
@@ -76,12 +76,13 @@ class RedisMapHaInfoTTLMonitor {
 	private final AtomicReference<Date> faultTimeMaker = new AtomicReference<>();
 
 	public RedisMapHaInfoTTLMonitor(Vertx vertx, ClusterManager clusterManager, RedissonClient redisson,
-			RedisMapHaInfo redisMapHaInfo) {
+			RedisMapHaInfo redisMapHaInfo, int refreshIntervalSeconds) {
 		Objects.requireNonNull(redisson, "redisson");
 		Objects.requireNonNull(redisMapHaInfo, "redisMapHaInfo");
 		this.vertx = vertx;
 		this.clusterManager = clusterManager;
 		this.redisMapHaInfo = redisMapHaInfo;
+		this.refreshIntervalSeconds = refreshIntervalSeconds;
 		this.mapAsync = redisMapHaInfo.getMapAsync();
 	}
 
@@ -316,13 +317,13 @@ class RedisMapHaInfoTTLMonitor {
 		}
 	}
 
-	public int getRefreshIntervalSeconds() {
-		return refreshIntervalSeconds;
-	}
+	// public int getRefreshIntervalSeconds() {
+	// return refreshIntervalSeconds;
+	// }
 
-	public void setRefreshIntervalSeconds(int refreshIntervalSeconds) {
-		this.refreshIntervalSeconds = refreshIntervalSeconds;
-	}
+	// public void setRefreshIntervalSeconds(int refreshIntervalSeconds) {
+	// this.refreshIntervalSeconds = refreshIntervalSeconds;
+	// }
 
 	private void detachListener() {
 		if (removedListeneId != 0) {

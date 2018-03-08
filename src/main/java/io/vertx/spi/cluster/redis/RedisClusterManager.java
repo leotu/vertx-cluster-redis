@@ -15,22 +15,18 @@
  */
 package io.vertx.spi.cluster.redis;
 
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Queue;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import org.redisson.Redisson;
 import org.redisson.api.RAtomicLong;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
-import org.redisson.config.Config;
 
 import io.vertx.core.AsyncResult;
 import io.vertx.core.Future;
@@ -39,7 +35,6 @@ import io.vertx.core.Vertx;
 import io.vertx.core.eventbus.impl.clustered.ClusterNodeInfo;
 import io.vertx.core.eventbus.impl.clustered.ClusteredEventBus;
 import io.vertx.core.eventbus.impl.clustered.ClusteredMessage;
-import io.vertx.core.json.JsonObject;
 //import org.slf4j.Logger;
 //import org.slf4j.LoggerFactory;
 import io.vertx.core.logging.Logger;
@@ -83,6 +78,9 @@ public class RedisClusterManager implements ClusterManager {
 	private NodeListener nodeListener;
 
 	private RedisMapHaInfo haInfo;
+	private final int haInfoTimeToLiveSeconds = 10; // TTL seconds
+	private final int haInfoRefreshIntervalSeconds = 5; // TTL Refresh seconds
+
 	private AsyncMultiMap<String, ClusterNodeInfo> subs;
 	private boolean cacheSubs = true;
 	private String cacheSubsTopicName = "cacheSubsTopic";
@@ -97,24 +95,27 @@ public class RedisClusterManager implements ClusterManager {
 		this.redisson = redisson;
 		this.nodeId = nodeId;
 		this.customRedissonClient = true;
+		log.debug(
+				"haInfoTimeToLiveSeconds: {}, haInfoRefreshIntervalSeconds: {}, cacheSubsTimeoutInSecoinds: {}, cacheSubs: {}",
+				haInfoTimeToLiveSeconds, haInfoRefreshIntervalSeconds, cacheSubsTimeoutInSecoinds, cacheSubs);
 	}
 
-	public RedisClusterManager(JsonObject config) {
-		Objects.requireNonNull(config, "config");
-		// log.debug("config={}", config);
-
-		String redisHost = config.getString("redisHost");
-		Integer redisPort = config.getInteger("redisPort");
-		Integer database = config.getInteger("database");
-		Config redissonConfig = new Config();
-		redissonConfig.useSingleServer() //
-				.setAddress("redis://" + redisHost + ":" + redisPort) //
-				.setDatabase(database);
-		this.redisson = Redisson.create(redissonConfig);
-		this.nodeId = redisHost + "_" + redisPort;
-		this.nodeId = UUID.nameUUIDFromBytes(nodeId.getBytes(StandardCharsets.UTF_8)).toString();
-		this.customRedissonClient = false;
-	}
+	// public RedisClusterManager(JsonObject config) {
+	// Objects.requireNonNull(config, "config");
+	// // log.debug("config={}", config);
+	//
+	// String redisHost = config.getString("redisHost");
+	// Integer redisPort = config.getInteger("redisPort");
+	// Integer database = config.getInteger("database");
+	// Config redissonConfig = new Config();
+	// redissonConfig.useSingleServer() //
+	// .setAddress("redis://" + redisHost + ":" + redisPort) //
+	// .setDatabase(database);
+	// this.redisson = Redisson.create(redissonConfig);
+	// this.nodeId = redisHost + "_" + redisPort;
+	// this.nodeId = UUID.nameUUIDFromBytes(nodeId.getBytes(StandardCharsets.UTF_8)).toString();
+	// this.customRedissonClient = false;
+	// }
 
 	public RedissonClient getRedisson() {
 		return redisson;
@@ -226,8 +227,8 @@ public class RedisClusterManager implements ClusterManager {
 			log.debug("name: {}", name);
 		}
 		if (name.equals(CLUSTER_MAP_NAME)) {
-			haInfo = new RedisMapHaInfo(vertx, this, redisson, name);
-			haInfo.disableTTL(); // XXX
+			haInfo = new RedisMapHaInfo(vertx, this, redisson, name, haInfoTimeToLiveSeconds, haInfoRefreshIntervalSeconds);
+			// haInfo.disableTTL(); // XXX
 			return (Map<K, V>) haInfo;
 		} else {
 			return new RedisMap<K, V>(vertx, redisson, name);
