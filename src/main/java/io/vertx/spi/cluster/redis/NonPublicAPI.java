@@ -39,6 +39,7 @@ import io.vertx.core.eventbus.impl.clustered.ReflectUtil;
 import io.vertx.core.impl.HAManager;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.net.impl.ServerID;
+import io.vertx.core.spi.cluster.ClusterManager;
 
 /**
  * Non Public API Utility
@@ -61,7 +62,7 @@ public class NonPublicAPI {
 	}
 
 	static public interface LocalCached {
-		void clearAll();
+		void discard();
 	}
 
 	/**
@@ -120,6 +121,10 @@ public class NonPublicAPI {
 
 		public static HAManager haManager(ClusteredEventBus eventBus) {
 			return Reflection.getFinalField(eventBus, ClusteredEventBus.class, "haManager");
+		}
+
+		public static ClusterManager clusterManager(ClusteredEventBus eventBus) {
+			return Reflection.getFinalField(eventBus, ClusteredEventBus.class, "clusterManager");
 		}
 
 		/**

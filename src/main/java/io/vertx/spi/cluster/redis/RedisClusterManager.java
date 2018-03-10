@@ -282,7 +282,7 @@ public class RedisClusterManager implements ClusterManager {
 			if (debug) {
 				log.debug("...");
 			}
-			((LocalCached) subs).clearAll();
+			((LocalCached) subs).discard();
 		}
 	}
 

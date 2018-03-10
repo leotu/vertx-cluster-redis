@@ -1,5 +1,6 @@
 package io.vertx.spi.cluster.redis.impl;
 
+import java.time.LocalDateTime;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Predicate;
@@ -33,8 +34,8 @@ public class LocalCachedAsyncMultiMap<K, V> implements AsyncMultiMap<K, V>, Loca
 
 	protected RTopic<K> subsTopic;
 	protected int topicListenerId;
-
 	protected long timerId;
+	protected LocalDateTime clearAllTimestamp;
 
 	public LocalCachedAsyncMultiMap(Vertx vertx, ClusterManager clusterManager, RedissonClient redisson,
 			AsyncMultiMap<K, V> delegate, int timeoutInSecoinds, String topicName) {
@@ -49,7 +50,7 @@ public class LocalCachedAsyncMultiMap<K, V> implements AsyncMultiMap<K, V>, Loca
 					if (debug) {
 						log.debug("*** [{}]: clear all, size: {}", topicListenerId, choosableSetLocalCached.size());
 					}
-					clearAll();
+					discard();
 				} else {
 					ChoosableIterable<V> previous = choosableSetLocalCached.remove(key);
 					if (debug) {
@@ -62,7 +63,19 @@ public class LocalCachedAsyncMultiMap<K, V> implements AsyncMultiMap<K, V>, Loca
 			if (debug) {
 				log.debug("timerId: {}, clear all, size: {}", timerId, choosableSetLocalCached.size());
 			}
-			choosableSetLocalCached.clear();
+			if (clearAllTimestamp == null) {
+				discard();
+			} else {
+				LocalDateTime now = LocalDateTime.now();
+				LocalDateTime checkTime = clearAllTimestamp.plusSeconds(timeoutInSecoinds / 2);
+				if (debug) {
+					log.debug("timerId: {}, timeoutInSecoinds: {}, now: {}, checkTime: {}, now.isAfter(checkTime): {}", timerId,
+							timeoutInSecoinds, now, checkTime, now.isAfter(checkTime));
+				}
+				if (now.isAfter(checkTime)) {
+					discard();
+				}
+			}
 		});
 
 		if (debug) {
@@ -71,7 +84,7 @@ public class LocalCachedAsyncMultiMap<K, V> implements AsyncMultiMap<K, V>, Loca
 	}
 
 	public void close() {
-		clearAll();
+		discard();
 		if (timerId > 0) {
 			if (debug) {
 				log.debug("cancelTimer: {}", timerId);
@@ -89,8 +102,11 @@ public class LocalCachedAsyncMultiMap<K, V> implements AsyncMultiMap<K, V>, Loca
 	}
 
 	@Override
-	public void clearAll() {
-		choosableSetLocalCached.clear();
+	public void discard() {
+		clearAllTimestamp = LocalDateTime.now();
+		if (!choosableSetLocalCached.isEmpty()) {
+			choosableSetLocalCached.clear();
+		}
 	}
 
 	@Override
