@@ -204,7 +204,7 @@ public class NonPublicAPI {
 
 	public static class Reflection {
 
-		private static <T> T getStaticFinalField(Class<?> clsObj, String staticFieldName) {
+		public static <T> T getStaticFinalField(Class<?> clsObj, String staticFieldName) {
 			return getFinalField(null, clsObj, staticFieldName);
 		}
 
@@ -213,7 +213,7 @@ public class NonPublicAPI {
 		 * @param reflectObj null for static field
 		 */
 		@SuppressWarnings("unchecked")
-		private static <T> T getFinalField(Object reflectObj, Class<?> clsObj, String fieldName) {
+		public static <T> T getFinalField(Object reflectObj, Class<?> clsObj, String fieldName) {
 			Objects.requireNonNull(clsObj, "clsObj");
 			Objects.requireNonNull(fieldName, "fieldName");
 			try {
