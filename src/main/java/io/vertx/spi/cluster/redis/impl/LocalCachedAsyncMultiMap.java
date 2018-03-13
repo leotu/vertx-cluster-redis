@@ -24,8 +24,6 @@ import io.vertx.spi.cluster.redis.NonPublicAPI.LocalCached;
 public class LocalCachedAsyncMultiMap<K, V> implements AsyncMultiMap<K, V>, LocalCached {
 	private static final Logger log = LoggerFactory.getLogger(LocalCachedAsyncMultiMap.class);
 
-	static private boolean debug = false;
-
 	private final AsyncMultiMap<K, V> delegate;
 	private final Vertx vertx;
 	private final ClusterManager clusterManager;
@@ -47,55 +45,35 @@ public class LocalCachedAsyncMultiMap<K, V> implements AsyncMultiMap<K, V>, Loca
 			@Override
 			public void onMessage(String channel, K key) {
 				if (key == null) {
-					if (debug) {
-						log.debug("*** [{}]: clear all, size: {}", topicListenerId, choosableSetLocalCached.size());
-					}
 					discard();
 				} else {
 					ChoosableIterable<V> previous = choosableSetLocalCached.remove(key);
-					if (debug) {
-						log.debug("*** [{}], key: {}, previous: {}", topicListenerId, key, previous);
+					if (previous != null) {
+						log.debug("topicListenerId: {}, key: {}, previous: {}", topicListenerId, key, previous);
 					}
 				}
 			}
 		});
 		this.timerId = vertx.setPeriodic(1000 * timeoutInSecoinds, id -> {
-			if (debug) {
-				log.debug("timerId: {}, clear all, size: {}", timerId, choosableSetLocalCached.size());
-			}
 			if (clearAllTimestamp == null) {
 				discard();
 			} else {
 				LocalDateTime now = LocalDateTime.now();
 				LocalDateTime checkTime = clearAllTimestamp.plusSeconds(timeoutInSecoinds / 2);
-				if (debug) {
-					log.debug("timerId: {}, timeoutInSecoinds: {}, now: {}, checkTime: {}, now.isAfter(checkTime): {}", timerId,
-							timeoutInSecoinds, now, checkTime, now.isAfter(checkTime));
-				}
 				if (now.isAfter(checkTime)) {
 					discard();
 				}
 			}
 		});
-
-		if (debug) {
-			log.debug("topicName: {}, timeoutInSecoinds: {}", topicName, timeoutInSecoinds);
-		}
 	}
 
 	public void close() {
 		discard();
 		if (timerId > 0) {
-			if (debug) {
-				log.debug("cancelTimer: {}", timerId);
-			}
 			vertx.cancelTimer(timerId);
 			timerId = 0;
 		}
 		if (topicListenerId > 0) {
-			if (debug) {
-				log.debug("remove topicListenerId: {}", topicListenerId);
-			}
 			subsTopic.removeListener(topicListenerId);
 			topicListenerId = 0;
 		}
@@ -134,9 +112,6 @@ public class LocalCachedAsyncMultiMap<K, V> implements AsyncMultiMap<K, V>, Loca
 			if (ar.succeeded()) {
 				ChoosableIterable<V> result = ar.result();
 				choosableSetLocalCached.put(k, result);
-				if (debug) {
-					log.debug("put: {}, size: {}", k, choosableSetLocalCached.size());
-				}
 				resultHandler.handle(Future.succeededFuture(result));
 			} else {
 				resultHandler.handle(Future.failedFuture(ar.cause()));
@@ -184,9 +159,7 @@ public class LocalCachedAsyncMultiMap<K, V> implements AsyncMultiMap<K, V>, Loca
 		fu.whenComplete((numOfClientsRreceived, error) -> {
 			if (error == null) {
 				int numOfNodes = clusterManager.getNodes().size();
-				if (numOfClientsRreceived != numOfNodes && debug) {
-					log.info("{}({}) numOfClientsRreceived: {}, numOfNodes: {}", method, k, numOfClientsRreceived, numOfNodes);
-				} else if (debug) {
+				if (numOfClientsRreceived != numOfNodes) {
 					log.debug("{}({}) numOfClientsRreceived: {}, numOfNodes: {}", method, k, numOfClientsRreceived, numOfNodes);
 				}
 			} else {

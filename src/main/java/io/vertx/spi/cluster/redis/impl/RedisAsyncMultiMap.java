@@ -50,8 +50,6 @@ import io.vertx.core.spi.cluster.ChoosableIterable;
 public class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 	private static final Logger log = LoggerFactory.getLogger(RedisAsyncMultiMap.class);
 
-	static private boolean debug = false;
-
 	protected ConcurrentMap<K, AtomicReference<V>> choosableSetPtr = new ConcurrentHashMap<>();
 	protected final RedissonClient redisson;
 	protected final Vertx vertx;
@@ -148,13 +146,6 @@ public class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 								values.forEach(value -> {
 									if (p.test(value)) { // XXX
 										deletedList.add(value);
-										if (debug) {
-											log.debug("add remove key={}, value.class={}, value={}", key, value.getClass().getName(), value);
-										}
-									} else {
-										if (debug) {
-											log.debug("skip remove key={} value.class={}, value={}", key, value.getClass().getName(), value);
-										}
 									}
 								});
 

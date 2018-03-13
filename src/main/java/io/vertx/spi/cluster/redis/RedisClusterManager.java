@@ -22,6 +22,7 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import org.redisson.api.RAtomicLong;
@@ -35,8 +36,6 @@ import io.vertx.core.Vertx;
 import io.vertx.core.eventbus.impl.clustered.ClusterNodeInfo;
 import io.vertx.core.eventbus.impl.clustered.ClusteredEventBus;
 import io.vertx.core.eventbus.impl.clustered.ClusteredMessage;
-//import org.slf4j.Logger;
-//import org.slf4j.LoggerFactory;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.net.impl.ServerID;
@@ -65,16 +64,13 @@ import io.vertx.spi.cluster.redis.impl.RedisMapHaInfo;
 public class RedisClusterManager implements ClusterManager {
 	private static final Logger log = LoggerFactory.getLogger(RedisClusterManager.class);
 
-	static private boolean debug = false;
-
 	private Vertx vertx;
 	private final RedissonClient redisson;
-	@SuppressWarnings("unused")
-	private final boolean customRedissonClient;
+
 	private String nodeId;
 	private ClusteredEventBus eventBus;
 
-	private volatile boolean active;
+	private AtomicBoolean active;
 	private boolean disableTTL = false; // XXX
 	private NodeListener nodeListener;
 
@@ -99,10 +95,6 @@ public class RedisClusterManager implements ClusterManager {
 		Objects.requireNonNull(nodeId, "nodeId");
 		this.redisson = redisson;
 		this.nodeId = nodeId;
-		this.customRedissonClient = true;
-		log.debug(
-				"haInfoTimeToLiveSeconds: {}, haInfoRefreshIntervalSeconds: {}, cacheSubsTimeoutInSecoinds: {}, cacheSubs: {}",
-				haInfoTimeToLiveSeconds, haInfoRefreshIntervalSeconds, cacheSubsTimeoutInSecoinds, enableCacheSubs);
 	}
 
 	public RedissonClient getRedisson() {
@@ -110,7 +102,6 @@ public class RedisClusterManager implements ClusterManager {
 	}
 
 	private void readyEventBus(ClusteredEventBus eventBus, AsyncMultiMap<String, ClusterNodeInfo> subs) {
-		// log.debug("...");
 		this.eventBus = eventBus;
 
 		@SuppressWarnings("unchecked")
@@ -138,19 +129,12 @@ public class RedisClusterManager implements ClusterManager {
 					if (pending != null && !pending.isEmpty()) {
 						pendingProcessor.run((ServerID) serverID, pending);
 					}
-				} else {
-					if (debug) {
-						log.debug("removed ok: {}, serverID: {}, connHolder: {}", ok, serverID, connHolder);
-					}
 				}
 				return ok;
 			}
 		};
 		ClusteredEventBusAPI.setConnections(this.eventBus, newOne); // reset to new Instance
 		if (!oldOne.isEmpty()) {
-			if (debug) {
-				log.debug("(!oldOne.isEmpty()), oldOne.size: {}", oldOne.size());
-			}
 			newOne.putAll(oldOne);
 		}
 	}
@@ -176,17 +160,11 @@ public class RedisClusterManager implements ClusterManager {
 					if (enableCacheSubs) {
 						subs = new LocalCachedAsyncMultiMap<String, ClusterNodeInfo>(vertx, this, redisson, subs,
 								cacheSubsTimeoutInSecoinds, cacheSubsTopicName);
-						if (debug) {
-							log.debug("name: {}, cacheSubs: {}, subs: {}", name, enableCacheSubs, subs);
-						}
 					}
 					readyEventBus(ClusteredEventBusAPI.eventBus(vertx), subs);
 				}
 				future.complete((AsyncMultiMap<K, V>) subs);
 			} else {
-				if (debug) {
-					log.debug("name: {}", name);
-				}
 				AsyncMultiMap<K, V> asyncMultiMap = (AsyncMultiMap<K, V>) asyncMultiMapCache.computeIfAbsent(name,
 						key -> new RedisAsyncMultiMap<K, V>(vertx, redisson, name));
 				future.complete(asyncMultiMap);
@@ -197,9 +175,6 @@ public class RedisClusterManager implements ClusterManager {
 
 	@Override
 	public <K, V> void getAsyncMap(String name, Handler<AsyncResult<AsyncMap<K, V>>> resultHandler) {
-		if (debug) {
-			log.debug("name: {}", name);
-		}
 		if (name.equals(CLUSTER_MAP_NAME)) {
 			log.error("name cannot be \"{}\"", name);
 			resultHandler.handle(Future.failedFuture(new IllegalArgumentException("name cannot be \"" + name + "\"")));
@@ -218,9 +193,6 @@ public class RedisClusterManager implements ClusterManager {
 	@SuppressWarnings("unchecked")
 	@Override
 	public <K, V> Map<K, V> getSyncMap(String name) {
-		if (debug) {
-			log.debug("name: {}", name);
-		}
 		if (name.equals(CLUSTER_MAP_NAME)) {
 			if (haInfo == null) {
 				haInfo = new RedisMapHaInfo(vertx, this, redisson, name, haInfoTimeToLiveSeconds, haInfoRefreshIntervalSeconds);
@@ -234,9 +206,6 @@ public class RedisClusterManager implements ClusterManager {
 
 	@Override
 	public void getLockWithTimeout(String name, long timeout, Handler<AsyncResult<Lock>> resultHandler) {
-		if (debug) {
-			log.debug("name: {}, timeout: {}", name, timeout);
-		}
 		try {
 			RLock lock = redisson.getLock(name); // getFairLock ?
 			lock.tryLockAsync(timeout, TimeUnit.MILLISECONDS).whenComplete((v, e) -> resultHandler
@@ -249,9 +218,6 @@ public class RedisClusterManager implements ClusterManager {
 
 	@Override
 	public void getCounter(String name, Handler<AsyncResult<Counter>> resultHandler) {
-		if (debug) {
-			log.debug("name: {}", name);
-		}
 		try {
 			RAtomicLong counter = redisson.getAtomicLong(name);
 			resultHandler.handle(Future.succeededFuture(new RedisCounter(counter)));
@@ -276,9 +242,6 @@ public class RedisClusterManager implements ClusterManager {
 
 	private void clearLocalCached() {
 		if (subs != null && subs instanceof LocalCached) {
-			if (debug) {
-				log.debug("...");
-			}
 			((LocalCached) subs).discard();
 		}
 	}
@@ -295,11 +258,7 @@ public class RedisClusterManager implements ClusterManager {
 			@Override
 			synchronized public void nodeAdded(String nodeId) {
 				clearLocalCached();
-				// if (isActive()) {
 				nodeListener.nodeAdded(nodeId);
-				// } else {
-				// log.warn("Inactive, skip execute nodeAdded({})", nodeId);
-				// }
 			}
 
 			/**
@@ -308,36 +267,54 @@ public class RedisClusterManager implements ClusterManager {
 			@Override
 			synchronized public void nodeLeft(String nodeId) {
 				clearLocalCached();
-				// if (isActive()) {
 				nodeListener.nodeLeft(nodeId);
-				// } else {
-				// log.warn("Inactive, skip execute nodeLeft({})", nodeId);
-				// }
 			}
 		};
 		this.haInfo.attachListener(this.nodeListener);
 	}
+
+	// private void startLocalMapCache() {
+	// this.timerId = vertx.setPeriodic(TimeUnit.MINUTES.toMillis(1), id -> {
+	// String keys[] = mapCache.keySet().toArray(new String[0]);
+	// Stream.of(keys).forEach(key -> {
+	// Map<?, ?> map = mapCache.get(key);
+	// if (map.isEmpty()) {
+	// mapCache.remove(key);
+	// }
+	// });
+	//
+	// //
+	// keys = asyncMapCache.keySet().toArray(new String[0]);
+	// Stream.of(keys).forEach(key -> {
+	// AsyncMap<?, ?> map = asyncMapCache.get(key);
+	// map.size(ar -> {
+	// if (ar.succeeded() && ar.result() == 0) {
+	// asyncMapCache.remove(key);
+	// }
+	// });
+	// });
+	//
+	// // FIXME: asyncMultiMapCache
+	// });
+	// }
 
 	/**
 	 * (2)
 	 */
 	@Override
 	public void join(Handler<AsyncResult<Void>> resultHandler) {
-		if (debug) {
-			log.debug("join nodeId={}", nodeId);
+		if (active.compareAndSet(false, true)) {
+			vertx.executeBlocking(future -> {
+				synchronized (RedisClusterManager.this) {
+					clearLocalCached();
+					future.complete();
+				}
+			}, resultHandler);
+		} else {
+			// throw new IllegalStateException("Already activated");
+			log.warn("Already activated, nodeId: {}", nodeId);
+			vertx.getOrCreateContext().runOnContext(v -> Future.<Void>succeededFuture().setHandler(resultHandler));
 		}
-		if (active) {
-			throw new IllegalStateException("Already activated");
-		}
-		vertx.executeBlocking(future -> {
-			if (active) {
-				future.fail(new IllegalStateException("Already activated"));
-			} else {
-				active = true;
-				clearLocalCached();
-				future.complete();
-			}
-		}, resultHandler);
 	}
 
 	/**
@@ -345,46 +322,24 @@ public class RedisClusterManager implements ClusterManager {
 	 */
 	@Override
 	public void leave(Handler<AsyncResult<Void>> resultHandler) {
-		if (debug) {
-			log.debug("leave nodeId={}", nodeId);
-		}
-		if (!active) {
-			throw new IllegalStateException("Already inactive");
-		}
-		vertx.executeBlocking(future -> {
-			synchronized (RedisClusterManager.this) {
-				if (!active) {
-					future.fail(new IllegalStateException("Already inactive"));
-				} else {
-					active = false;
-					try {
-						nodeListener = null;
-						clearLocalCached();
-						future.complete();
-					} catch (Exception e) {
-						future.fail(e);
-					}
+		if (active.compareAndSet(true, false)) {
+			vertx.executeBlocking(future -> {
+				synchronized (RedisClusterManager.this) {
+					clearLocalCached();
+					future.complete();
 				}
-			}
-		}, resultHandler);
+			}, resultHandler);
+		} else {
+			// throw new IllegalStateException("Already inactive");
+			log.warn("Already activated, nodeId: {}", nodeId);
+			vertx.getOrCreateContext().runOnContext(v -> Future.<Void>succeededFuture().setHandler(resultHandler));
+		}
 	}
 
 	@Override
 	public boolean isActive() {
-		return active;
+		return active.get();
 	}
-
-	// public boolean isInactive() {
-	// return nodeListener == null || !isActive() || NonPublicAPI.isInactive(vertx, redisson);
-	// }
-
-	// public void close() {
-	// subs.close();
-	// haInfo.close();
-	// if (!customClient) {
-	// redisson.shutdown(5, 15, TimeUnit.SECONDS);
-	// }
-	// }
 
 	/**
 	 * Lock implement
@@ -398,6 +353,19 @@ public class RedisClusterManager implements ClusterManager {
 
 		@Override
 		public void get(Handler<AsyncResult<Long>> resultHandler) {
+			// Context context = vertx.getOrCreateContext();
+
+			// counter.getAsync().whenComplete((v, e) -> {
+			// if (e != null) {
+			// context.runOnContext(vv -> Future.<Long>failedFuture(e).setHandler(resultHandler));
+			// } else {
+			// context.runOnContext(vv -> Future.<Long>succeededFuture(v).setHandler(resultHandler));
+			// }
+			// });
+
+			// counter.getAsync().whenComplete((v, e) -> context.runOnContext(vv -> //
+			// resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v))));
+
 			counter.getAsync()
 					.whenComplete((v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
 		}

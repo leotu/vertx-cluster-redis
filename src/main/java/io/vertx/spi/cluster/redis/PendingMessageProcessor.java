@@ -43,8 +43,6 @@ import io.vertx.spi.cluster.redis.NonPublicAPI.ClusteredEventBusAPI.ConnectionHo
 class PendingMessageProcessor {
 	private static final Logger log = LoggerFactory.getLogger(PendingMessageProcessor.class);
 
-	static private boolean debug = false;
-
 	final static private String HA_ORIGINAL_SERVER_ID_KEY = "_HA_ORIGINAL_SERVER_ID";
 	final static private String HA_RESEND_SERVER_ID_KEY = "_HA_RESEND_SERVER_ID";
 	final static private String HA_RESEND_AGAIN_SERVER_ID_KEY = "_HA_RESEND_AGAIN_SERVER_ID";
@@ -75,9 +73,6 @@ class PendingMessageProcessor {
 		ClusteredMessage<?, ?> message;
 		while ((message = pending.poll()) != null) { // FIFO
 			if (!clusterManager.isActive()) {
-				if (debug) {
-					log.debug("!isActive(), serverID: {}, pending.size: {}", serverID, pending.size());
-				}
 				pending.clear();
 			} else if (!discard(message)) {
 				resend(serverID, message);
@@ -87,15 +82,9 @@ class PendingMessageProcessor {
 
 	private boolean discard(ClusteredMessage<?, ?> message) {
 		if (!message.isSend()) { // skip Publish
-			if (debug) {
-				log.debug("discard(!message.isSend()): address: {}", message.address());
-			}
 			return true;
 		}
 		if (message.isFromWire()) { // skip readFromWire
-			if (debug) {
-				log.debug("discard(message.isFromWire()): address: {}", message.address());
-			}
 			return true;
 		}
 
@@ -104,19 +93,15 @@ class PendingMessageProcessor {
 		String haResendAgainServerId = message.headers().get(HA_RESEND_AGAIN_SERVER_ID_KEY);
 
 		if (haResendAgainServerId != null) {
-			if (debug) {
-				log.debug(
-						"discard(haResendAgainServerId != null): haResendAgainServerId: {}, haResendServerId: {}, haResendAgainServerId: {}, address: {}",
-						haResendAgainServerId, haResendServerId, haResendAgainServerId, message.address());
-			}
+			log.debug(
+					"discard(haResendAgainServerId != null): haResendAgainServerId: {}, haResendServerId: {}, haResendAgainServerId: {}, address: {}",
+					haResendAgainServerId, haResendServerId, haResendAgainServerId, message.address());
 			return true; // had retry 2 times
 		}
 		if (haOriginalServerId != null && haResendServerId != null && haOriginalServerId.equals(haResendServerId)) {
-			if (debug) {
-				log.debug(
-						"discard(haOriginalServerId.equals(haResendServerId)): haResendAgainServerId: {}, haResendServerId: {}, haResendAgainServerId: {}, address: {}",
-						haResendAgainServerId, haResendServerId, haResendAgainServerId, message.address());
-			}
+			log.debug(
+					"discard(haOriginalServerId.equals(haResendServerId)): haResendAgainServerId: {}, haResendServerId: {}, haResendAgainServerId: {}, address: {}",
+					haResendAgainServerId, haResendServerId, haResendAgainServerId, message.address());
 			return true; // had retry original server
 		}
 		return false;
@@ -173,7 +158,7 @@ class PendingMessageProcessor {
 						break;
 					} else if (pending != null) {
 						pendingServerID = sid;
-						log.debug("skip pendingServerID: {}, pending.size: {}", pendingServerID, pending.size());
+						// log.debug("skip pendingServerID: {}, pending.size: {}", pendingServerID, pending.size());
 					}
 				}
 			} else if (sid.equals(clusterServerID)) {
@@ -185,10 +170,10 @@ class PendingMessageProcessor {
 			if (choosedServerID.equals(failedServerID) && localServerID != null) {
 				// FIXME: change to localServerID ?
 			}
-			log.info("new one not found, return to failed or pending server: {}, address: {}", choosedServerID,
+			log.debug("new one not found, return to failed or pending server: {}, address: {}", choosedServerID,
 					message.address());
 		} else {
-			log.info("switch to new server: {}, previous failed server: {}, address: {}", choosedServerID, failedServerID,
+			log.debug("switch to new server: {}, previous failed server: {}, address: {}", choosedServerID, failedServerID,
 					message.address());
 		}
 

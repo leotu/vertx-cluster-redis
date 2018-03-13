@@ -42,8 +42,6 @@ import io.vertx.core.AsyncResult;
 import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
-import io.vertx.core.logging.Logger;
-import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.shareddata.AsyncMap;
 import io.vertx.spi.cluster.redis.ExpirableAsync;
 import io.vertx.spi.cluster.redis.NonPublicAPI.Reflection;
@@ -53,9 +51,7 @@ import io.vertx.spi.cluster.redis.NonPublicAPI.Reflection;
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
 public class RedisAsyncMap<K, V> implements AsyncMap<K, V>, ExpirableAsync<K> {
-	private static final Logger log = LoggerFactory.getLogger(RedisAsyncMap.class);
-
-	static private boolean debug = false;
+	// private static final Logger log = LoggerFactory.getLogger(RedisAsyncMap.class);
 
 	protected final RedisStrictCommand<Long> ZSCORE_LONG = new RedisStrictCommand<Long>("ZSCORE",
 			new LongReplayConvertor()); // RedisCommands.ZSCORE
@@ -72,9 +68,6 @@ public class RedisAsyncMap<K, V> implements AsyncMap<K, V>, ExpirableAsync<K> {
 		this.redisson = redisson;
 		this.name = name;
 		this.map = createRMapCache(this.redisson, this.name);
-		if (debug) {
-			log.debug("map.codec.class: {}", map.getCodec().getClass().getName());
-		}
 	}
 
 	/**
@@ -88,8 +81,6 @@ public class RedisAsyncMap<K, V> implements AsyncMap<K, V>, ExpirableAsync<K> {
 		// return redisson.getMapCache(name);
 	}
 
-	// FstCodec
-
 	@Override
 	public void get(K k, Handler<AsyncResult<V>> resultHandler) {
 		map.getAsync(k).whenComplete((v, e) -> {
@@ -99,19 +90,12 @@ public class RedisAsyncMap<K, V> implements AsyncMap<K, V>, ExpirableAsync<K> {
 
 	@Override
 	public void put(K k, V v, Handler<AsyncResult<Void>> completionHandler) {
-		if (debug) {
-			log.debug("k: {}, v: {}", k, v);
-		}
-
 		map.fastPutAsync(k, v).whenComplete(
 				(added, e) -> completionHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture()));
 	}
 
 	@Override
 	public void put(K k, V v, long ttl, Handler<AsyncResult<Void>> completionHandler) {
-		if (debug) {
-			log.debug("k: {}, v: {}, ttl: {}", k, v, ttl);
-		}
 		map.fastPutAsync(k, v, ttl, TimeUnit.MILLISECONDS).whenComplete(
 				(added, e) -> completionHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture()));
 	}
@@ -121,9 +105,6 @@ public class RedisAsyncMap<K, V> implements AsyncMap<K, V>, ExpirableAsync<K> {
 	 */
 	@Override
 	public void putIfAbsent(K k, V v, Handler<AsyncResult<V>> completionHandler) {
-		if (debug) {
-			log.debug("k: {}, v: {}", k, v);
-		}
 		map.putIfAbsentAsync(k, v).whenComplete((previousValue, e) -> completionHandler
 				.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(previousValue)));
 	}
@@ -133,27 +114,18 @@ public class RedisAsyncMap<K, V> implements AsyncMap<K, V>, ExpirableAsync<K> {
 	 */
 	@Override
 	public void putIfAbsent(K k, V v, long ttl, Handler<AsyncResult<V>> completionHandler) {
-		if (debug) {
-			log.debug("k: {}, v: {}, ttl: {}", k, v, ttl);
-		}
 		map.putIfAbsentAsync(k, v, ttl, TimeUnit.MILLISECONDS).whenComplete((previousValue, e) -> completionHandler
 				.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(previousValue)));
 	}
 
 	@Override
 	public void remove(K k, Handler<AsyncResult<V>> resultHandler) {
-		if (debug) {
-			log.debug("k: {}", k);
-		}
 		map.removeAsync(k).whenComplete((previousValue, e) -> resultHandler
 				.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(previousValue)));
 	}
 
 	@Override
 	public void removeIfPresent(K k, V v, Handler<AsyncResult<Boolean>> resultHandler) {
-		if (debug) {
-			log.debug("k: {}, v: {}", k, v);
-		}
 		map.removeAsync(k, v).whenComplete(
 				(removed, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(removed)));
 	}
@@ -163,27 +135,18 @@ public class RedisAsyncMap<K, V> implements AsyncMap<K, V>, ExpirableAsync<K> {
 	 */
 	@Override
 	public void replace(K k, V v, Handler<AsyncResult<V>> resultHandler) {
-		if (debug) {
-			log.debug("k: {}, v: {}", k, v);
-		}
 		map.replaceAsync(k, v).whenComplete((previousValue, e) -> resultHandler
 				.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(previousValue)));
 	}
 
 	@Override
 	public void replaceIfPresent(K k, V oldValue, V newValue, Handler<AsyncResult<Boolean>> resultHandler) {
-		if (debug) {
-			log.debug("k: {}, oldValue: {}, newValue: {}", k, oldValue, newValue);
-		}
 		map.replaceAsync(k, oldValue, newValue).whenComplete(
 				(replaced, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(replaced)));
 	}
 
 	@Override
 	public void clear(Handler<AsyncResult<Void>> resultHandler) {
-		if (debug) {
-			log.debug("clear all");
-		}
 		map.deleteAsync().whenComplete(
 				(deleted, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture()));
 	}
@@ -223,9 +186,6 @@ public class RedisAsyncMap<K, V> implements AsyncMap<K, V>, ExpirableAsync<K> {
 	 */
 	@Override
 	public void refreshIfPresent(K k, long timeToLive, TimeUnit timeUnit, Handler<AsyncResult<Long>> resultHandler) {
-		if (debug) {
-			log.debug("k: {}, timeToLive: {}", k, timeToLive);
-		}
 		final String key = Reflection.callMethod(map, RedissonMapCache.class, "getTimeoutSetNameByKey",
 				new Class<?>[] { Object.class }, new Object[] { name });
 
@@ -235,7 +195,6 @@ public class RedisAsyncMap<K, V> implements AsyncMap<K, V>, ExpirableAsync<K> {
 
 		final Long ttl = timeUnit.toMillis(timeToLive);
 		long currentTime = System.currentTimeMillis() + ttl;
-		log.debug("### key={}, field={}, ttl={}, currentTime={}", key, field, ttl, currentTime);
 
 		// final ByteBuf encodeMapValue = Reflection.callMethod(map, RedissonObject.class, "encodeMapValue",
 		// new Class<?>[] { Object.class }, new Object[] { field });
@@ -248,7 +207,6 @@ public class RedisAsyncMap<K, V> implements AsyncMap<K, V>, ExpirableAsync<K> {
 		commandExecutor.writeAsync(key, LongCodec.INSTANCE, RedisCommands.ZADD_INT, key, zaddOptions, currentTime, field)
 				.whenCompleteAsync((value, e) -> {
 					if (e == null) { // java.lang.Boolean / java.lang.Long
-						log.debug("### class={}, value={}", value == null ? "<null>" : value.getClass().getName(), value);
 						Long numOfAdded = (Long) value; // num.longValue() == 0
 						// Boolean added = (Boolean) value;
 						resultHandler.handle(Future.succeededFuture(numOfAdded)); // (Boolean) value)

@@ -52,8 +52,6 @@ import io.vertx.spi.cluster.redis.AsyncLocalLock;
 public class RedisAsyncMultiMapSubs extends RedisAsyncMultiMap<String, ClusterNodeInfo> {
 	private static final Logger log = LoggerFactory.getLogger(RedisAsyncMultiMapSubs.class);
 
-	static private boolean debug = false;
-
 	private final ClusterManager clusterManager;
 
 	public RedisAsyncMultiMapSubs(Vertx vertx, ClusterManager clusterManager, RedissonClient redisson, String name) {
@@ -94,17 +92,10 @@ public class RedisAsyncMultiMapSubs extends RedisAsyncMultiMap<String, ClusterNo
 	private void batchRemoveAllMatching(Predicate<ClusterNodeInfo> p, Handler<AsyncResult<Void>> completionHandler) {
 		List<Map.Entry<String, ClusterNodeInfo>> deletedList = new ArrayList<>();
 		mmap.entries().forEach(entry -> {
-			String key = entry.getKey();
+			// String key = entry.getKey();
 			ClusterNodeInfo value = entry.getValue();
 			if (p.test(value)) { // XXX: "!members.contains(ci.nodeId)"
 				deletedList.add(entry);
-				if (debug) {
-					log.debug("add remove key={}, value.class={}, value={}", key, value.getClass().getName(), value);
-				}
-			} else {
-				if (debug) {
-					log.debug("skip remove key={} value.class={}, value={}", key, value.getClass().getName(), value);
-				}
 			}
 		});
 
@@ -137,7 +128,7 @@ public class RedisAsyncMultiMapSubs extends RedisAsyncMultiMap<String, ClusterNo
 		final String nodeID = clusterManager.getNodeID();
 		batchRemoveAllMatching_(p, ar -> {
 			if (!lockList.isEmpty()) {
-				log.warn("(!lockList.isEmpty()), nodeID: {}, lockList.size: {}", nodeID, lockList.size());
+				log.info("(!lockList.isEmpty()), nodeID: {}, lockList.size: {}", nodeID, lockList.size());
 				releaseLock(lockList); // try again !
 			}
 			completionHandler.handle(ar.failed() ? Future.failedFuture(ar.cause()) : Future.succeededFuture());
@@ -154,72 +145,45 @@ public class RedisAsyncMultiMapSubs extends RedisAsyncMultiMap<String, ClusterNo
 		int timeoutInSeconds = 3; // XXX
 		Map<String, Future<Lock>> acquireLocks = new HashMap<>(); // <nodeID, ...>
 		mmap.entries().forEach(entry -> {
-			String key = entry.getKey();
+			// String key = entry.getKey();
 			ClusterNodeInfo value = entry.getValue();
 			String deleteNodeId = value.nodeId;
 			if (p.test(value)) { // XXX: "!members.contains(ci.nodeId)"
 				deletedList.add(entry);
-				if (debug) {
-					log.debug("prepare add remove nodeID={}, key={}, deleteNodeId={}", nodeID, key, deleteNodeId);
-				}
-
 				if (!acquireLocks.containsKey(deleteNodeId)) {
 					Future<Lock> f = Future.future();
 					acquireLocks.put(deleteNodeId, f);
 					AsyncLocalLock.acquireLockWithTimeout(vertx, deleteNodeId, timeoutInSeconds, f);
 				}
-			} else {
-				if (debug) {
-					log.debug("prepare skip remove nodeID={}, key={}, deleteNodeId={}", nodeID, key, deleteNodeId);
-				}
 			}
 		});
 
 		if (!deletedList.isEmpty()) {
-			if (debug) {
-				log.debug("nodeID={}, acquireLocks: {}", nodeID, acquireLocks.keySet());
-			}
 			RBatch batch = redisson.createBatch();
 			deletedList.forEach(entry -> {
 				String key = entry.getKey();
 				ClusterNodeInfo value = entry.getValue();
-				if (debug) {
-					log.debug("nodeID={}, key: {}, value: {}", nodeID, key, value);
-				}
 				mmap.removeAsync(key, value).whenComplete((ok, e) -> {
-					if (debug) {
-						log.debug("prepare removeAsync, nodeID={}, key: {}, value: {}, ok: {}", nodeID, key, value, ok);
-					}
 					if (e != null) {
 						log.warn("prepare removeAsync failed, nodeID: {}, key: {}, value: {}, error: {}", nodeID, key, value,
 								e.toString());
 					}
 				});
 			});
-			if (debug) {
-				log.debug("*** nodeID={}, deletedList.size: {}, acquireLocks.size={}", nodeID, deletedList.size(),
-						acquireLocks.size());
-			}
+
 			CompositeFuture.join(new ArrayList<Future>(acquireLocks.values())).setHandler(ar -> {
 				if (ar.failed()) {
 					log.warn("nodeID: {}, deletedList.size: {},  acquireLocks.size: {}, lockList.size: {}, error: {}", nodeID,
 							deletedList.size(), acquireLocks.size(), lockList.size(), ar.cause().toString());
 				}
 				acquireLocks.entrySet().forEach(entry -> {
-					String deleteNodeId = entry.getKey();
+					// String deleteNodeId = entry.getKey();
 					Future<Lock> f = entry.getValue();
 					if (f.succeeded()) {
 						lockList.add(f.result());
-					} else {
-						if (debug) {
-							log.debug("nodeID={}, deleteNodeId={}, error={}", nodeID, deleteNodeId, f.cause().toString());
-						}
 					}
 				});
-				if (debug) {
-					log.debug("nodeID={}, deletedList.size={}, acquireLocks.size={}, lockList.size={}", nodeID,
-							deletedList.size(), acquireLocks.size(), lockList.size());
-				}
+
 				if (acquireLocks.size() != lockList.size()) {
 					log.warn("(acquireLocks.size() != lockList.size()), nodeID: {}, acquireLocks.size: {}, lockList.size: {}",
 							nodeID, acquireLocks.size(), lockList.size());
@@ -237,10 +201,6 @@ public class RedisAsyncMultiMapSubs extends RedisAsyncMultiMap<String, ClusterNo
 				});
 
 			});
-		} else {
-			if (debug) {
-				log.debug("nodeID={}, deletedList.size={}", nodeID, deletedList.size());
-			}
 		}
 	}
 
@@ -251,7 +211,4 @@ public class RedisAsyncMultiMapSubs extends RedisAsyncMultiMap<String, ClusterNo
 		});
 		lockList.clear();
 	}
-
-	// public void close() {
-	// }
 }

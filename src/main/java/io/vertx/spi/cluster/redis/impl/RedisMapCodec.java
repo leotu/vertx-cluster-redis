@@ -48,7 +48,6 @@ import io.vertx.core.shareddata.impl.ClusterSerializable;
  */
 public class RedisMapCodec implements Codec {
 	private static final Logger log = LoggerFactory.getLogger(RedisMapCodec.class);
-	static private boolean debug = false;
 
 	private final Encoder encoder = new Encoder() {
 		@Override
@@ -58,9 +57,6 @@ public class RedisMapCodec implements Codec {
 				ByteBufOutputStream os = new ByteBufOutputStream(out);
 				try (DataOutputStream dataOutput = new DataOutputStream(os)) {
 					if (in instanceof ClusterSerializable) {
-						if (debug) {
-							log.debug("ClusterSerializable clazz: {}", in.getClass().getName());
-						}
 						ClusterSerializable clusterSerializable = (ClusterSerializable) in;
 						dataOutput.writeBoolean(true);
 						dataOutput.writeUTF(in.getClass().getName());
@@ -79,9 +75,7 @@ public class RedisMapCodec implements Codec {
 					return os.buffer();
 				}
 			} catch (IOException e) {
-				if (debug) {
-					log.info("in.class: {}", in == null ? "<null>" : in.getClass().getName());
-				}
+				log.warn("in.class: {}, error: {}", in == null ? "<null>" : in.getClass().getName(), e.toString());
 				out.release();
 				throw e;
 			}
@@ -97,9 +91,6 @@ public class RedisMapCodec implements Codec {
 				if (isClusterSerializable) {
 					String className = in.readUTF();
 					Class<?> clazz = Thread.currentThread().getContextClassLoader().loadClass(className);
-					if (debug) {
-						log.debug("ClusterSerializable clazz: {}", clazz.getName());
-					}
 					int length = in.readInt();
 					byte[] body = new byte[length];
 					in.readFully(body);
@@ -125,9 +116,7 @@ public class RedisMapCodec implements Codec {
 					return objectIn.readObject();
 				}
 			} catch (Exception e) {
-				if (debug) {
-					log.info("buf.class: {}, state: {}", buf.getClass().getName(), state);
-				}
+				log.warn("buf.class: {}, state: {}, error: {}", buf.getClass().getName(), state, e.toString());
 				buf.release();
 				throw new IOException(e.getMessage(), e);
 			}

@@ -27,8 +27,6 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
 
-import org.slf4j.Logger;
-
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
 import io.vertx.core.eventbus.impl.MessageImpl;
@@ -38,6 +36,7 @@ import io.vertx.core.eventbus.impl.clustered.ClusteredMessage;
 import io.vertx.core.eventbus.impl.clustered.ReflectUtil;
 import io.vertx.core.impl.HAManager;
 import io.vertx.core.json.JsonObject;
+import io.vertx.core.logging.Logger;
 import io.vertx.core.net.impl.ServerID;
 import io.vertx.core.spi.cluster.ClusterManager;
 
@@ -48,8 +47,6 @@ import io.vertx.core.spi.cluster.ClusterManager;
  */
 public class NonPublicAPI {
 	// private static final Logger log = LoggerFactory.getLogger(NonPublicAPI.class);
-
-	// static private boolean debug = true;
 
 	public static final String HA_CLUSTER_MAP_NAME;
 	public static final String EB_SERVER_ID_HA_KEY;
@@ -75,23 +72,6 @@ public class NonPublicAPI {
 			vertx.getOrCreateContext().runOnContext(action);
 		}
 	}
-
-	// public static boolean isInactive(Vertx vertx, RedissonClient redisson) {
-	// final ClusteredEventBus eventBus = (ClusteredEventBus) vertx.eventBus();
-	// if (eventBus != null) {
-	// final HAManager haManager = ClusteredEventBusAPI.getHAManager(vertx);
-	// final VertxInternal vertxInternal = (VertxInternal) vertx;
-	// if (haManager != null) {
-	// final boolean haManagerStopped = Reflection.getField(haManager, HAManager.class, "stopped");
-	// return vertxInternal.isKilled() || redisson.isShutdown() || redisson.isShuttingDown() || haManager.isKilled()
-	// || haManagerStopped;
-	// } else {
-	// return vertxInternal.isKilled() || redisson.isShutdown() || redisson.isShuttingDown();
-	// }
-	// } else {
-	// return redisson.isShutdown() || redisson.isShuttingDown();
-	// }
-	// }
 
 	/**
 	 * 
@@ -189,7 +169,6 @@ public class NonPublicAPI {
 		 * @see ClusteredEventBus#connections
 		 */
 		public static ConcurrentMap<ServerID, ?> connections(ClusteredEventBus eventBus) {
-			// return Reflection.getField(eventBus, ClusteredEventBus.class, "connections");
 			return Reflection.callMethod(eventBus, ClusteredEventBus.class, "connections");
 		}
 
