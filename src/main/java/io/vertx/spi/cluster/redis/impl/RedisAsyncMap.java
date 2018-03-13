@@ -92,8 +92,9 @@ public class RedisAsyncMap<K, V> implements AsyncMap<K, V>, ExpirableAsync<K> {
 
 	@Override
 	public void get(K k, Handler<AsyncResult<V>> resultHandler) {
-		map.getAsync(k)
-				.whenComplete((v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
+		map.getAsync(k).whenComplete((v, e) -> {
+			resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v));
+		});
 	}
 
 	@Override

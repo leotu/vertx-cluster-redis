@@ -19,7 +19,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.redisson.api.RMapCache;
 import org.redisson.api.RedissonClient;
-import org.redisson.client.codec.StringCodec;
 
 import io.vertx.core.Vertx;
 //import org.slf4j.Logger;
@@ -57,7 +56,8 @@ public class RedisMapHaInfo extends RedisMap<String, String> {
 	 */
 	@Override
 	protected RMapCache<String, String> createMap(RedissonClient redisson, String name) {
-		this.mapAsync = redisson.getMapCache(name, new StringCodec());
+		// this.mapAsync = redisson.getMapCache(name, new StringCodec());
+		this.mapAsync = redisson.getMapCache(name);
 		// log.debug("mapAsync.codec.class={}", mapAsync.getCodec().getClass().getName());
 		return this.mapAsync;
 	}
@@ -69,22 +69,6 @@ public class RedisMapHaInfo extends RedisMap<String, String> {
 	protected int getTimeToLiveSeconds() {
 		return timeToLiveSeconds;
 	}
-
-	// /**
-	// * @see #setTimeToLiveSeconds
-	// */
-	// public void disableTTL() {
-	// log.debug("...");
-	// setTimeToLiveSeconds(0);
-	// }
-	//
-	// /**
-	// *
-	// * @param timeToLiveSeconds disable when value <= 0
-	// */
-	// public void setTimeToLiveSeconds(int timeToLiveSeconds) {
-	// this.timeToLiveSeconds = timeToLiveSeconds;
-	// }
 
 	public void attachListener(NodeListener nodeListener) {
 		ttlMonitor.attachListener(nodeListener);
