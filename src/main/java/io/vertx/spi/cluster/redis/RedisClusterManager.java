@@ -70,7 +70,7 @@ public class RedisClusterManager implements ClusterManager {
 	private String nodeId;
 	private ClusteredEventBus eventBus;
 
-	private AtomicBoolean active;
+	private AtomicBoolean active = new AtomicBoolean();
 	private boolean disableTTL = false; // XXX
 	private NodeListener nodeListener;
 
