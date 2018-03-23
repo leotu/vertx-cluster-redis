@@ -140,7 +140,7 @@ public class RedisClusterManager implements ClusterManager {
 	}
 
 	/**
-	 * (1)
+	 *
 	 */
 	@Override
 	public void setVertx(Vertx vertx) {
@@ -148,7 +148,7 @@ public class RedisClusterManager implements ClusterManager {
 	}
 
 	/**
-	 * (5), eventBus been created !
+	 * EventBus been created !
 	 */
 	@SuppressWarnings("unchecked")
 	@Override
@@ -178,6 +178,7 @@ public class RedisClusterManager implements ClusterManager {
 		if (name.equals(CLUSTER_MAP_NAME)) {
 			log.error("name cannot be \"{}\"", name);
 			resultHandler.handle(Future.failedFuture(new IllegalArgumentException("name cannot be \"" + name + "\"")));
+			return;
 		}
 		vertx.executeBlocking(future -> {
 			@SuppressWarnings("unchecked")
@@ -188,7 +189,7 @@ public class RedisClusterManager implements ClusterManager {
 	}
 
 	/**
-	 * (3)
+	 *
 	 */
 	@SuppressWarnings("unchecked")
 	@Override
@@ -211,7 +212,7 @@ public class RedisClusterManager implements ClusterManager {
 			lock.tryLockAsync(timeout, TimeUnit.MILLISECONDS).whenComplete((v, e) -> resultHandler
 					.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(new RedisLock(lock))));
 		} catch (Exception e) {
-			log.warn("nodeId: " + nodeId + ", name: " + name + ", timeout: " + timeout, e);
+			log.info("nodeId: " + nodeId + ", name: " + name + ", timeout: " + timeout, e);
 			resultHandler.handle(Future.failedFuture(e));
 		}
 	}
@@ -222,7 +223,7 @@ public class RedisClusterManager implements ClusterManager {
 			RAtomicLong counter = redisson.getAtomicLong(name);
 			resultHandler.handle(Future.succeededFuture(new RedisCounter(counter)));
 		} catch (Exception e) {
-			log.error("nodeId: " + nodeId + ", name: " + name, e);
+			log.info("nodeId: " + nodeId + ", name: " + name, e);
 			resultHandler.handle(Future.failedFuture(e));
 		}
 	}
@@ -247,7 +248,6 @@ public class RedisClusterManager implements ClusterManager {
 	}
 
 	/**
-	 * (4)
 	 * 
 	 * @see io.vertx.core.impl.HAManager#nodeAdded
 	 * @see io.vertx.core.impl.HAManager#nodeLeft
@@ -299,7 +299,7 @@ public class RedisClusterManager implements ClusterManager {
 	// }
 
 	/**
-	 * (2)
+	 *
 	 */
 	@Override
 	public void join(Handler<AsyncResult<Void>> resultHandler) {
@@ -318,7 +318,7 @@ public class RedisClusterManager implements ClusterManager {
 	}
 
 	/**
-	 * (6)
+	 *
 	 */
 	@Override
 	public void leave(Handler<AsyncResult<Void>> resultHandler) {

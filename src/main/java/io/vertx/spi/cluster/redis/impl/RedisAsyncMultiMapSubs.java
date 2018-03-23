@@ -22,7 +22,10 @@ import java.util.Map;
 import java.util.function.Predicate;
 
 import org.redisson.api.RBatch;
+import org.redisson.api.RSetMultimap;
 import org.redisson.api.RedissonClient;
+import org.redisson.client.codec.StringCodec;
+import org.redisson.codec.JsonJacksonCodec;
 
 import io.vertx.core.AsyncResult;
 import io.vertx.core.CompositeFuture;
@@ -47,6 +50,8 @@ import io.vertx.spi.cluster.redis.AsyncLocalLock;
  * 
  * @see io.vertx.core.net.impl.ServerID
  * @see org.redisson.codec.JsonJacksonCodec
+ * @see io.vertx.core.eventbus.impl.clustered.ClusterNodeInfo
+ * 
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
 public class RedisAsyncMultiMapSubs extends RedisAsyncMultiMap<String, ClusterNodeInfo> {
@@ -57,6 +62,23 @@ public class RedisAsyncMultiMapSubs extends RedisAsyncMultiMap<String, ClusterNo
 	public RedisAsyncMultiMapSubs(Vertx vertx, ClusterManager clusterManager, RedissonClient redisson, String name) {
 		super(vertx, redisson, name);
 		this.clusterManager = clusterManager;
+	}
+
+	/**
+	 * @see org.redisson.codec.JsonJacksonCodec
+	 */
+	@Override
+	protected RSetMultimap<String, ClusterNodeInfo> createMultimap(RedissonClient redisson, String name) {
+		// <String, ClusterNodeInfo>
+		RSetMultimap<String, ClusterNodeInfo> mmap = redisson.getSetMultimap(name, new KeyValueCodec( //
+				JsonJacksonCodec.INSTANCE.getValueEncoder(), //
+				JsonJacksonCodec.INSTANCE.getValueDecoder(), //
+				StringCodec.INSTANCE.getMapKeyEncoder(), //
+				StringCodec.INSTANCE.getMapKeyDecoder(), //
+				JsonJacksonCodec.INSTANCE.getValueEncoder(), //
+				JsonJacksonCodec.INSTANCE.getValueDecoder()) //
+		);
+		return mmap;
 	}
 
 	@Override

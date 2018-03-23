@@ -48,9 +48,9 @@ import io.vertx.core.spi.cluster.ClusterManager;
 public class NonPublicAPI {
 	// private static final Logger log = LoggerFactory.getLogger(NonPublicAPI.class);
 
-	public static final String HA_CLUSTER_MAP_NAME;
-	public static final String EB_SERVER_ID_HA_KEY;
-	public static final String EB_SUBS_MAP_NAME;
+	public static final String HA_CLUSTER_MAP_NAME; // "__vertx.haInfo"
+	public static final String EB_SERVER_ID_HA_KEY; // "server_id"
+	public static final String EB_SUBS_MAP_NAME; // "__vertx.subs"
 
 	static {
 		HA_CLUSTER_MAP_NAME = Reflection.getStaticFinalField(HAManager.class, "CLUSTER_MAP_NAME");

@@ -19,6 +19,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.redisson.api.RMapCache;
 import org.redisson.api.RedissonClient;
+import org.redisson.client.codec.StringCodec;
 
 import io.vertx.core.Vertx;
 //import org.slf4j.Logger;
@@ -31,6 +32,9 @@ import io.vertx.core.spi.cluster.NodeListener;
 /**
  * CLUSTER_MAP_NAME = "__vertx.haInfo"
  * 
+ * @see io.vertx.core.impl.HAManager
+ * @see io.vertx.core.json.JsonObject#encode
+ * 
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
 public class RedisMapHaInfo extends RedisMap<String, String> {
@@ -39,7 +43,6 @@ public class RedisMapHaInfo extends RedisMap<String, String> {
 	private final int timeToLiveSeconds;
 
 	private final ClusterManager clusterManager;
-	private RMapCache<String, String> mapAsync;
 	private final RedisMapHaInfoTTLMonitor ttlMonitor;
 
 	public RedisMapHaInfo(Vertx vertx, ClusterManager clusterManager, RedissonClient redisson, String name,
@@ -52,18 +55,16 @@ public class RedisMapHaInfo extends RedisMap<String, String> {
 
 	/**
 	 * @see org.redisson.codec.JsonJacksonCodec
-	 * @see org.redisson.client.codec.JsonJacksonMapCodec
 	 */
 	@Override
 	protected RMapCache<String, String> createMap(RedissonClient redisson, String name) {
-		// this.mapAsync = redisson.getMapCache(name, new StringCodec());
-		this.mapAsync = redisson.getMapCache(name);
-		// log.debug("mapAsync.codec.class={}", mapAsync.getCodec().getClass().getName());
-		return this.mapAsync;
+		// <String, String>
+		RMapCache<String, String> mapAsync = redisson.getMapCache(name, new StringCodec());
+		return mapAsync;
 	}
 
 	protected RMapCache<String, String> getMapAsync() {
-		return mapAsync;
+		return (RMapCache<String, String>) map;
 	}
 
 	protected int getTimeToLiveSeconds() {
@@ -84,7 +85,7 @@ public class RedisMapHaInfo extends RedisMap<String, String> {
 	@Override
 	public String put(String key, String value) {
 		try {
-			return timeToLiveSeconds > 0 ? mapAsync.put(key, value, timeToLiveSeconds, TimeUnit.SECONDS)
+			return timeToLiveSeconds > 0 ? getMapAsync().put(key, value, timeToLiveSeconds, TimeUnit.SECONDS)
 					: super.put(key, value);
 		} catch (Exception ignore) {
 			String previous = super.put(key, value);

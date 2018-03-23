@@ -60,7 +60,16 @@ public class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 		Objects.requireNonNull(name, "name");
 		this.vertx = vertx;
 		this.redisson = redisson;
-		this.mmap = redisson.getSetMultimap(name);
+		this.mmap = createMultimap(this.redisson, name);
+	}
+
+	/**
+	 * Here you can customize(override method) a "Codec"
+	 * 
+	 * @see org.redisson.codec.JsonJacksonCodec
+	 */
+	protected RSetMultimap<K, V> createMultimap(RedissonClient redisson, String name) {
+		return redisson.getSetMultimap(name);
 	}
 
 	@Override

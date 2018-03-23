@@ -101,7 +101,7 @@ public class RedisAsyncMap<K, V> implements AsyncMap<K, V>, ExpirableAsync<K> {
 	}
 
 	/**
-	 * @return previous value always null
+	 * @return Previous value if key already exists else null
 	 */
 	@Override
 	public void putIfAbsent(K k, V v, Handler<AsyncResult<V>> completionHandler) {
@@ -110,7 +110,7 @@ public class RedisAsyncMap<K, V> implements AsyncMap<K, V>, ExpirableAsync<K> {
 	}
 
 	/**
-	 * @return previous value always null
+	 * @return Previous value if key already exists else null
 	 */
 	@Override
 	public void putIfAbsent(K k, V v, long ttl, Handler<AsyncResult<V>> completionHandler) {
