@@ -39,6 +39,7 @@ import org.redisson.command.CommandAsyncExecutor;
 import io.netty.buffer.ByteBuf;
 import io.netty.util.CharsetUtil;
 import io.vertx.core.AsyncResult;
+import io.vertx.core.Context;
 import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
@@ -83,21 +84,26 @@ public class RedisAsyncMap<K, V> implements AsyncMap<K, V>, ExpirableAsync<K> {
 
 	@Override
 	public void get(K k, Handler<AsyncResult<V>> resultHandler) {
-		map.getAsync(k).whenComplete((v, e) -> {
-			resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v));
-		});
+		Context context = vertx.getOrCreateContext();
+		map.getAsync(k).whenComplete((v, e) -> context.runOnContext(vd -> //
+		resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v))) //
+		);
 	}
 
 	@Override
 	public void put(K k, V v, Handler<AsyncResult<Void>> completionHandler) {
-		map.fastPutAsync(k, v).whenComplete(
-				(added, e) -> completionHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture()));
+		Context context = vertx.getOrCreateContext();
+		map.fastPutAsync(k, v).whenComplete((added, e) -> context.runOnContext(vd -> //
+		completionHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture())) //
+		);
 	}
 
 	@Override
 	public void put(K k, V v, long ttl, Handler<AsyncResult<Void>> completionHandler) {
-		map.fastPutAsync(k, v, ttl, TimeUnit.MILLISECONDS).whenComplete(
-				(added, e) -> completionHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture()));
+		Context context = vertx.getOrCreateContext();
+		map.fastPutAsync(k, v, ttl, TimeUnit.MILLISECONDS).whenComplete((added, e) -> context.runOnContext(vd -> //
+		completionHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture())) //
+		);
 	}
 
 	/**
@@ -105,8 +111,10 @@ public class RedisAsyncMap<K, V> implements AsyncMap<K, V>, ExpirableAsync<K> {
 	 */
 	@Override
 	public void putIfAbsent(K k, V v, Handler<AsyncResult<V>> completionHandler) {
-		map.putIfAbsentAsync(k, v).whenComplete((previousValue, e) -> completionHandler
-				.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(previousValue)));
+		Context context = vertx.getOrCreateContext();
+		map.putIfAbsentAsync(k, v).whenComplete((previousValue, e) -> context.runOnContext(vd -> //
+		completionHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(previousValue))) //
+		);
 	}
 
 	/**
@@ -114,20 +122,26 @@ public class RedisAsyncMap<K, V> implements AsyncMap<K, V>, ExpirableAsync<K> {
 	 */
 	@Override
 	public void putIfAbsent(K k, V v, long ttl, Handler<AsyncResult<V>> completionHandler) {
-		map.putIfAbsentAsync(k, v, ttl, TimeUnit.MILLISECONDS).whenComplete((previousValue, e) -> completionHandler
-				.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(previousValue)));
+		Context context = vertx.getOrCreateContext();
+		map.putIfAbsentAsync(k, v, ttl, TimeUnit.MILLISECONDS).whenComplete((previousValue, e) -> context.runOnContext(vd -> //
+		completionHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(previousValue))) //
+		);
 	}
 
 	@Override
 	public void remove(K k, Handler<AsyncResult<V>> resultHandler) {
-		map.removeAsync(k).whenComplete((previousValue, e) -> resultHandler
-				.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(previousValue)));
+		Context context = vertx.getOrCreateContext();
+		map.removeAsync(k).whenComplete((previousValue, e) -> context.runOnContext(vd -> //
+		resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(previousValue))) //
+		);
 	}
 
 	@Override
 	public void removeIfPresent(K k, V v, Handler<AsyncResult<Boolean>> resultHandler) {
-		map.removeAsync(k, v).whenComplete(
-				(removed, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(removed)));
+		Context context = vertx.getOrCreateContext();
+		map.removeAsync(k, v).whenComplete((removed, e) -> context.runOnContext(vd -> //
+		resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(removed))) //
+		);
 	}
 
 	/**
@@ -135,46 +149,59 @@ public class RedisAsyncMap<K, V> implements AsyncMap<K, V>, ExpirableAsync<K> {
 	 */
 	@Override
 	public void replace(K k, V v, Handler<AsyncResult<V>> resultHandler) {
-		map.replaceAsync(k, v).whenComplete((previousValue, e) -> resultHandler
-				.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(previousValue)));
+		Context context = vertx.getOrCreateContext();
+		map.replaceAsync(k, v).whenComplete((previousValue, e) -> context.runOnContext(vd -> //
+		resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(previousValue))) //
+		);
 	}
 
 	@Override
 	public void replaceIfPresent(K k, V oldValue, V newValue, Handler<AsyncResult<Boolean>> resultHandler) {
-		map.replaceAsync(k, oldValue, newValue).whenComplete(
-				(replaced, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(replaced)));
+		Context context = vertx.getOrCreateContext();
+		map.replaceAsync(k, oldValue, newValue).whenComplete((replaced, e) -> context.runOnContext(vd -> //
+		resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(replaced))) //
+		);
 	}
 
 	@Override
 	public void clear(Handler<AsyncResult<Void>> resultHandler) {
-		map.deleteAsync().whenComplete(
-				(deleted, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture()));
+		Context context = vertx.getOrCreateContext();
+		map.deleteAsync().whenComplete((deleted, e) -> context.runOnContext(vd -> //
+		resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture())) //
+		);
 	}
 
 	@Override
 	public void size(Handler<AsyncResult<Integer>> resultHandler) {
-		map.sizeAsync()
-				.whenComplete((v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
+		Context context = vertx.getOrCreateContext();
+		map.sizeAsync().whenComplete((v, e) -> context.runOnContext(vd -> //
+		resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v))) //
+		);
 	}
 
 	@Override
 	public void keys(Handler<AsyncResult<Set<K>>> resultHandler) {
-		map.readAllKeySetAsync()
-				.whenComplete((v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
+		Context context = vertx.getOrCreateContext();
+		map.readAllKeySetAsync().whenComplete((v, e) -> context.runOnContext(vd -> //
+		resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v))) //
+		);
 	}
 
 	@Override
 	public void values(Handler<AsyncResult<List<V>>> resultHandler) {
-		map.readAllValuesAsync().whenComplete((v, e) -> {
-			resultHandler.handle(e != null ? Future.failedFuture(e)
-					: Future.succeededFuture((v instanceof List) ? (List<V>) v : new ArrayList<>(v)));
-		});
+		Context context = vertx.getOrCreateContext();
+		map.readAllValuesAsync().whenComplete((v, e) -> context.runOnContext(vd -> //
+		resultHandler.handle(e != null ? Future.failedFuture(e)
+				: Future.succeededFuture((v instanceof List) ? (List<V>) v : new ArrayList<>(v)))) //
+		);
 	}
 
 	@Override
 	public void entries(Handler<AsyncResult<Map<K, V>>> resultHandler) {
-		map.readAllMapAsync()
-				.whenComplete((v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
+		Context context = vertx.getOrCreateContext();
+		map.readAllMapAsync().whenComplete((v, e) -> context.runOnContext(vd -> //
+		resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v))) //
+		);
 	}
 
 	/**
@@ -186,6 +213,7 @@ public class RedisAsyncMap<K, V> implements AsyncMap<K, V>, ExpirableAsync<K> {
 	 */
 	@Override
 	public void refreshIfPresent(K k, long timeToLive, TimeUnit timeUnit, Handler<AsyncResult<Long>> resultHandler) {
+		Context context = vertx.getOrCreateContext();
 		final String key = Reflection.callMethod(map, RedissonMapCache.class, "getTimeoutSetNameByKey",
 				new Class<?>[] { Object.class }, new Object[] { name });
 
@@ -209,9 +237,9 @@ public class RedisAsyncMap<K, V> implements AsyncMap<K, V>, ExpirableAsync<K> {
 					if (e == null) { // java.lang.Boolean / java.lang.Long
 						Long numOfAdded = (Long) value; // num.longValue() == 0
 						// Boolean added = (Boolean) value;
-						resultHandler.handle(Future.succeededFuture(numOfAdded)); // (Boolean) value)
+						context.runOnContext(vd -> resultHandler.handle(Future.succeededFuture(numOfAdded))); // (Boolean) value)
 					} else {
-						resultHandler.handle(Future.failedFuture(e));
+						context.runOnContext(vd -> resultHandler.handle(Future.failedFuture(e)));
 					}
 				});
 
@@ -224,6 +252,17 @@ public class RedisAsyncMap<K, V> implements AsyncMap<K, V>, ExpirableAsync<K> {
 	 */
 	@Override
 	public void getTTL(K k, Handler<AsyncResult<Long>> resultHandler) {
+		Context context = vertx.getOrCreateContext();
+		getTTL2(k, ar -> {
+			if (ar.failed()) {
+				context.runOnContext(vd -> resultHandler.handle(Future.failedFuture(ar.cause())));
+			} else {
+				context.runOnContext(vd -> resultHandler.handle(Future.succeededFuture(ar.result())));
+			}
+		});
+	}
+
+	private void getTTL2(K k, Handler<AsyncResult<Long>> resultHandler) {
 		// final String key = "redisson__timeout__set:{" + name + "}"; // XXX
 		final String key = Reflection.callMethod(map, RedissonMapCache.class, "getTimeoutSetNameByKey",
 				new Class<?>[] { Object.class }, new Object[] { name });

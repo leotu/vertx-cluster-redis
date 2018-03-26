@@ -27,7 +27,6 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
 
-import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
 import io.vertx.core.eventbus.impl.MessageImpl;
 import io.vertx.core.eventbus.impl.clustered.ClusterNodeInfo;
@@ -60,17 +59,6 @@ public class NonPublicAPI {
 
 	static public interface LocalCached {
 		void discard();
-	}
-
-	/**
-	 * FIX: Non Vert.x thread
-	 */
-	public static void runOnContext(Vertx vertx, Handler<Void> action) {
-		if (Vertx.currentContext() != null) { // FIXME
-			action.handle(null);
-		} else {
-			vertx.getOrCreateContext().runOnContext(action);
-		}
 	}
 
 	/**

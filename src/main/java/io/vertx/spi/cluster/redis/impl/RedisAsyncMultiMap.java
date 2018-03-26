@@ -31,6 +31,7 @@ import org.redisson.api.RedissonClient;
 
 import io.vertx.core.AsyncResult;
 import io.vertx.core.CompositeFuture;
+import io.vertx.core.Context;
 import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
@@ -74,28 +75,33 @@ public class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 
 	@Override
 	public void add(K k, V v, Handler<AsyncResult<Void>> completionHandler) {
-		mmap.putAsync(k, v).whenComplete(
-				(added, e) -> completionHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture()));
+		Context context = vertx.getOrCreateContext();
+		mmap.putAsync(k, v).whenComplete((added, e) -> context.runOnContext(vd -> //
+		completionHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture())) //
+		);
 	}
 
 	@Override
 	public void get(K k, Handler<AsyncResult<ChoosableIterable<V>>> resultHandler) {
+		Context context = vertx.getOrCreateContext();
 		mmap.getAllAsync(k).whenComplete((v, e) -> { // java.util.LinkedHashSet
 			if (e != null) {
-				resultHandler.handle(Future.failedFuture(e));
+				context.runOnContext(vd -> resultHandler.handle(Future.failedFuture(e)));
 			} else {
 				RedisChoosableSet<V> values = new RedisChoosableSet<>(v != null ? v.size() : 0, getCurrentPointer(k));
 				values.addAll(v);
 				values.moveToCurrent();
-				resultHandler.handle(Future.succeededFuture(values));
+				context.runOnContext(vd -> resultHandler.handle(Future.succeededFuture(values)));
 			}
 		});
 	}
 
 	@Override
 	public void remove(K k, V v, Handler<AsyncResult<Boolean>> completionHandler) {
-		mmap.removeAsync(k, v).whenComplete(
-				(removed, e) -> completionHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(removed)));
+		Context context = vertx.getOrCreateContext();
+		mmap.removeAsync(k, v).whenComplete((removed, e) -> context.runOnContext(vd -> //
+		completionHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(removed))) //
+		);
 	}
 
 	@Override
@@ -106,9 +112,20 @@ public class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 	/**
 	 * Remove values which satisfies the given predicate in all keys.
 	 */
-	@SuppressWarnings({ "rawtypes" })
 	@Override
 	public void removeAllMatching(Predicate<V> p, Handler<AsyncResult<Void>> completionHandler) {
+		Context context = vertx.getOrCreateContext();
+		batchRemoveAllMatching(p, ar -> {
+			if (ar.failed()) {
+				context.runOnContext(vd -> completionHandler.handle(Future.failedFuture(ar.cause())));
+			} else {
+				context.runOnContext(vd -> completionHandler.handle(Future.succeededFuture(ar.result())));
+			}
+		});
+	}
+
+	@SuppressWarnings({ "rawtypes" })
+	private void batchRemoveAllMatching(Predicate<V> p, Handler<AsyncResult<Void>> completionHandler) {
 		mmap.readAllKeySetAsync().whenComplete((keys, e) -> {
 			if (e != null) {
 				log.warn("error: {}", e.toString());

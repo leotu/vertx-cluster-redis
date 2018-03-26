@@ -29,6 +29,7 @@ import org.redisson.codec.JsonJacksonCodec;
 
 import io.vertx.core.AsyncResult;
 import io.vertx.core.CompositeFuture;
+import io.vertx.core.Context;
 import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
@@ -38,7 +39,6 @@ import io.vertx.core.eventbus.impl.clustered.ClusterNodeInfo;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.shareddata.Lock;
-import io.vertx.core.spi.cluster.ChoosableIterable;
 import io.vertx.core.spi.cluster.ClusterManager;
 import io.vertx.spi.cluster.redis.AsyncLocalLock;
 
@@ -82,21 +82,6 @@ public class RedisAsyncMultiMapSubs extends RedisAsyncMultiMap<String, ClusterNo
 	}
 
 	@Override
-	public void add(String k, ClusterNodeInfo v, Handler<AsyncResult<Void>> completionHandler) {
-		super.add(k, v, completionHandler);
-	}
-
-	@Override
-	public void get(String k, Handler<AsyncResult<ChoosableIterable<ClusterNodeInfo>>> resultHandler) {
-		super.get(k, resultHandler);
-	}
-
-	@Override
-	public void remove(String k, ClusterNodeInfo v, Handler<AsyncResult<Boolean>> completionHandler) {
-		super.remove(k, v, completionHandler);
-	}
-
-	@Override
 	public void removeAllForValue(ClusterNodeInfo v, Handler<AsyncResult<Void>> completionHandler) {
 		removeAllMatching(value -> value == v || value.equals(v), completionHandler);
 	}
@@ -108,7 +93,14 @@ public class RedisAsyncMultiMapSubs extends RedisAsyncMultiMap<String, ClusterNo
 	 */
 	@Override
 	public void removeAllMatching(Predicate<ClusterNodeInfo> p, Handler<AsyncResult<Void>> completionHandler) {
-		batchRemoveAllMatching(p, completionHandler);
+		Context context = vertx.getOrCreateContext();
+		batchRemoveAllMatching(p, ar -> {
+			if (ar.failed()) {
+				context.runOnContext(vd -> completionHandler.handle(Future.failedFuture(ar.cause())));
+			} else {
+				context.runOnContext(vd -> completionHandler.handle(Future.succeededFuture(ar.result())));
+			}
+		});
 	}
 
 	private void batchRemoveAllMatching(Predicate<ClusterNodeInfo> p, Handler<AsyncResult<Void>> completionHandler) {

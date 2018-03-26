@@ -30,6 +30,7 @@ import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 
 import io.vertx.core.AsyncResult;
+import io.vertx.core.Context;
 import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
@@ -353,57 +354,58 @@ public class RedisClusterManager implements ClusterManager {
 
 		@Override
 		public void get(Handler<AsyncResult<Long>> resultHandler) {
-			// Context context = vertx.getOrCreateContext();
-
-			// counter.getAsync().whenComplete((v, e) -> {
-			// if (e != null) {
-			// context.runOnContext(vv -> Future.<Long>failedFuture(e).setHandler(resultHandler));
-			// } else {
-			// context.runOnContext(vv -> Future.<Long>succeededFuture(v).setHandler(resultHandler));
-			// }
-			// });
-
-			// counter.getAsync().whenComplete((v, e) -> context.runOnContext(vv -> //
-			// resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v))));
-
-			counter.getAsync()
-					.whenComplete((v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
+			Context context = vertx.getOrCreateContext();
+			counter.getAsync().whenComplete((v, e) -> context.runOnContext(vd -> //
+			resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v))) //
+			);
 		}
 
 		@Override
 		public void incrementAndGet(Handler<AsyncResult<Long>> resultHandler) {
-			counter.incrementAndGetAsync()
-					.whenComplete((v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
+			Context context = vertx.getOrCreateContext();
+			counter.incrementAndGetAsync().whenComplete((v, e) -> context.runOnContext(vd -> //
+			resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v))) //
+			);
 		}
 
 		@Override
 		public void getAndIncrement(Handler<AsyncResult<Long>> resultHandler) {
-			counter.getAndIncrementAsync()
-					.whenComplete((v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
+			Context context = vertx.getOrCreateContext();
+			counter.getAndIncrementAsync().whenComplete((v, e) -> context.runOnContext(vd -> //
+			resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v))) //
+			);
 		}
 
 		@Override
 		public void decrementAndGet(Handler<AsyncResult<Long>> resultHandler) {
-			counter.decrementAndGetAsync()
-					.whenComplete((v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
+			Context context = vertx.getOrCreateContext();
+			counter.decrementAndGetAsync().whenComplete((v, e) -> context.runOnContext(vd -> //
+			resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v))) //
+			);
 		}
 
 		@Override
 		public void addAndGet(long value, Handler<AsyncResult<Long>> resultHandler) {
-			counter.addAndGetAsync(value)
-					.whenComplete((v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
+			Context context = vertx.getOrCreateContext();
+			counter.addAndGetAsync(value).whenComplete((v, e) -> context.runOnContext(vd -> //
+			resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v))) //
+			);
 		}
 
 		@Override
 		public void getAndAdd(long value, Handler<AsyncResult<Long>> resultHandler) {
-			counter.getAndAddAsync(value)
-					.whenComplete((v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
+			Context context = vertx.getOrCreateContext();
+			counter.getAndAddAsync(value).whenComplete((v, e) -> context.runOnContext(vd -> //
+			resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v))) //
+			);
 		}
 
 		@Override
 		public void compareAndSet(long expected, long value, Handler<AsyncResult<Boolean>> resultHandler) {
-			counter.compareAndSetAsync(expected, value)
-					.whenComplete((v, e) -> resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v)));
+			Context context = vertx.getOrCreateContext();
+			counter.compareAndSetAsync(expected, value).whenComplete((v, e) -> context.runOnContext(vd -> //
+			resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v))) //
+			);
 		}
 	}
 
