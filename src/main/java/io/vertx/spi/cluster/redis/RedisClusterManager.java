@@ -106,10 +106,11 @@ public class RedisClusterManager implements ClusterManager {
 		this.eventBus = eventBus;
 
 		@SuppressWarnings("unchecked")
-		ConcurrentMap<ServerID, Object> oldOne = (ConcurrentMap<ServerID, Object>) ClusteredEventBusAPI
+		final ConcurrentMap<ServerID, Object> oldOne = (ConcurrentMap<ServerID, Object>) ClusteredEventBusAPI
 				.connections(this.eventBus);
+
 		@SuppressWarnings("serial")
-		ConcurrentMap<ServerID, Object> newOne = new ConcurrentHashMap<ServerID, Object>() {
+		final ConcurrentMap<ServerID, Object> newOne = new ConcurrentHashMap<ServerID, Object>() {
 			PendingMessageProcessor pendingProcessor = new PendingMessageProcessor(vertx, RedisClusterManager.this, eventBus,
 					subs, this);
 
@@ -125,11 +126,22 @@ public class RedisClusterManager implements ClusterManager {
 					Queue<ClusteredMessage<?, ?>> pending = ConnectionHolderAPI.pending(connHolder);
 					ServerID holderServerID = ConnectionHolderAPI.serverID(connHolder);
 					if (!serverID.equals(holderServerID)) {
-						log.warn("(!serverID.equals(holderServerID), serverID: {}, holderServerID: {}", serverID, holderServerID);
+						throw new RuntimeException(
+								"(!serverID.equals(holderServerID), serverID: " + serverID + ", holderServerID: " + holderServerID);
 					}
 					if (pending != null && !pending.isEmpty()) {
-						pendingProcessor.run((ServerID) serverID, pending);
+						Future<Void> fu = pendingProcessor.run((ServerID) serverID, pending);
+						fu.setHandler(ar -> {
+							if (ar.failed()) {
+								log.warn("serverID: {}, pendingProcessor error: {}", serverID, ar.cause().toString());
+							}
+						});
 					}
+					// else {
+					// log.debug("serverID: {}, pending.size: {}", serverID, pending == null ? "<null>" : pending.size());
+					// }
+				} else {
+					log.debug("skip pendingProcessor serverID: {}, removed failed: {}", serverID);
 				}
 				return ok;
 			}

@@ -23,6 +23,8 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import io.vertx.core.impl.ConcurrentHashSet;
+import io.vertx.core.logging.Logger;
+import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.spi.cluster.ChoosableIterable;
 
 /**
@@ -31,6 +33,7 @@ import io.vertx.core.spi.cluster.ChoosableIterable;
  */
 @SuppressWarnings("serial")
 class RedisChoosableSet<T> implements ChoosableIterable<T>, Serializable {
+	private static final Logger log = LoggerFactory.getLogger(RedisChoosableSet.class);
 
 	private final Set<T> ids;
 	private volatile Iterator<T> iter;
@@ -110,6 +113,7 @@ class RedisChoosableSet<T> implements ChoosableIterable<T>, Serializable {
 				current.set(t);
 				return t;
 			} catch (NoSuchElementException e) {
+				log.warn(e.toString());
 				return null;
 			}
 		} else {
