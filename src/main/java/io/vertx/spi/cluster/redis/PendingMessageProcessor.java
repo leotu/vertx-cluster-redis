@@ -47,12 +47,12 @@ import io.vertx.spi.cluster.redis.NonPublicAPI.ClusteredEventBusAPI.ConnectionHo
  * 
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
-public class PendingMessageProcessor {
+class PendingMessageProcessor {
 	private static final Logger log = LoggerFactory.getLogger(PendingMessageProcessor.class);
 
-	final static private String HA_ORIGINAL_SERVER_ID_KEY = "_HA_ORIGINAL_SERVER_ID";
-	final static private String HA_RESEND_SERVER_ID_KEY = "_HA_RESEND_SERVER_ID";
-	final static private String HA_RESEND_AGAIN_SERVER_ID_KEY = "_HA_RESEND_AGAIN_SERVER_ID";
+	final static private String HA_ORIGINAL_SERVER_ID_KEY = "__HA_ORIGINAL_SERVER_ID";
+	final static private String HA_RESEND_SERVER_ID_KEY = "__HA_RESEND_SERVER_ID";
+	final static private String HA_RESEND_AGAIN_SERVER_ID_KEY = "__HA_RESEND_AGAIN_SERVER_ID";
 
 	private boolean debug = false;
 
@@ -95,64 +95,59 @@ public class PendingMessageProcessor {
 		}
 
 		int pendingSize = pending.size();
-		Queue<Future> runStatusFutures = new ArrayDeque<>();
+		Queue<Future> runStatusFutures = new ArrayDeque<>(pendingSize);
 		for (int i = 0; i < pendingSize; i++) {
 			runStatusFutures.add(Future.future());
 		}
-		List<Future> list = new ArrayList<>(runStatusFutures);
+		List<Future> completeFutures = new ArrayList<>(runStatusFutures);
 
-		Future<Void> finish = Future.future();
-		vertx.executeBlocking(future -> {
-			ClusteredMessage<?, ?> cmessage;
-			while ((cmessage = pending.poll()) != null) { // FIFO
-				Future<Integer> runStatusFuture = runStatusFutures.poll();
-				final ClusteredMessage<?, ?> message = cmessage;
-				if (!clusterManager.isActive()) {
-					if (debug) {
-						log.debug("(!clusterManager.isActive())");
-					}
-					pending.clear();
-					//
-					runStatusFuture.complete(0);
-					Future<Integer> f;
-					while ((f = runStatusFutures.poll()) != null) {
-						f.complete(0);
-					}
-					break;
-				} else if (!discard(message)) {
-					resend(failedServerID, message).setHandler(ar -> {
-						if (ar.failed()) {
-							log.debug(
-									"failed {} to retry {} message, address: {}, replyAddress:{}, isSend:{}, isFromWire:{}, error: {}",
-									message.isSend() ? "send" : "publish", failedServerID, message.address(), message.replyAddress(),
-									message.isFromWire(), ar.cause().toString());
-							runStatusFuture.fail(ar.cause());
-						} else {
-							if (!ar.result()) {
-								log.debug(
-										"failed {} to retry {} message, address: {}, replyAddress:{}, isSend:{}, isFromWire:{}, no available serverID.",
-										message.isSend() ? "send" : "publish", failedServerID, message.address(), message.replyAddress(),
-										message.isFromWire());
-							}
-							runStatusFuture.complete(ar.result() ? 1 : 0);
-						}
-					});
-				} else {
-					log.debug("discard {} to retry {} message, address: {}, replyAddress:{}, isSend:{}, isFromWire:{}",
-							message.isSend() ? "send" : "publish", failedServerID, message.address(), message.replyAddress(),
-							message.isFromWire());
-					runStatusFuture.complete(-1);
+		for (ClusteredMessage<?, ?> message = pending.poll(); message != null; message = pending.poll()) { // FIFO
+			Future<Integer> runStatusFuture = runStatusFutures.poll();
+			if (!clusterManager.isActive()) {
+				if (debug) {
+					log.debug("(!clusterManager.isActive())");
 				}
-			} // while
+				pending.clear();
+				//
+				runStatusFuture.complete(0);
+				Future<Integer> f;
+				while ((f = runStatusFutures.poll()) != null) {
+					f.complete(0);
+				}
+				break;
+			} else if (!discard(message)) {
+				ClusteredMessage<?, ?> cmessage = message;
+				resend(failedServerID, message).setHandler(ar -> {
+					if (ar.failed()) {
+						log.debug(
+								"failed {} to retry {} message, address: {}, replyAddress:{}, isSend:{}, isFromWire:{}, error: {}",
+								cmessage.isSend() ? "send" : "publish", failedServerID, cmessage.address(), cmessage.replyAddress(),
+								cmessage.isFromWire(), ar.cause().toString());
+						runStatusFuture.fail(ar.cause());
+					} else {
+						if (!ar.result()) {
+							log.debug(
+									"failed {} to retry {} message, address: {}, replyAddress:{}, isSend:{}, isFromWire:{}, no available serverID.",
+									cmessage.isSend() ? "send" : "publish", failedServerID, cmessage.address(), cmessage.replyAddress(),
+									cmessage.isFromWire());
+						}
+						runStatusFuture.complete(ar.result() ? 1 : 0);
+					}
+				});
+			} else {
+				log.debug("discard {} to retry {} message, address: {}, replyAddress:{}, isSend:{}, isFromWire:{}",
+						message.isSend() ? "send" : "publish", failedServerID, message.address(), message.replyAddress(),
+						message.isFromWire());
+				runStatusFuture.complete(-1);
+			}
+		} // while
 
-			complete(pendingSize, list, future);
-		}, finish);
-		return finish;
+		return complete(pendingSize, completeFutures, Future.future());
 	}
 
 	@SuppressWarnings("rawtypes")
-	private void complete(int pendingSize, List<Future> list, Future future) {
-		CompositeFuture.join(list).setHandler(ar -> {
+	private Future complete(int pendingSize, List<Future> completeFutures, Future future) {
+		CompositeFuture.join(completeFutures).setHandler(ar -> {
 			// if (ar.failed()) { // All completed and at least one faileds
 			// } else { // All succeeded
 			// }
@@ -160,7 +155,7 @@ public class PendingMessageProcessor {
 			int discardCounter = 0;
 			int sureSendedCounter = 0;
 			int notSendedCounter = 0;
-			for (Future f : list) {
+			for (Future f : completeFutures) {
 				if (f.failed()) {
 					failedCounter++;
 				} else {
@@ -183,6 +178,7 @@ public class PendingMessageProcessor {
 			}
 			future.complete();
 		});
+		return future;
 	}
 
 	private boolean discard(ClusteredMessage<?, ?> message) {
@@ -195,25 +191,16 @@ public class PendingMessageProcessor {
 			}
 			return true;
 		}
+		if (!isRetry(message)) {
+			return false;
+		}
+		if (isRetryTwice(message)) { // had retry 2 times
+			return true;
+		}
 
 		String haOriginalServerId = message.headers().get(HA_ORIGINAL_SERVER_ID_KEY);
 		String haResendServerId = message.headers().get(HA_RESEND_SERVER_ID_KEY);
-		String haResendAgainServerId = message.headers().get(HA_RESEND_AGAIN_SERVER_ID_KEY);
-
-		if (haResendAgainServerId != null) {
-			if (debug) {
-				log.debug(
-						"discard(haResendAgainServerId != null): haResendAgainServerId: {}, haResendServerId: {}, haResendAgainServerId: {}, address: {}",
-						haResendAgainServerId, haResendServerId, haResendAgainServerId, message.address());
-			}
-			return true; // had retry 2 times
-		}
-		if (haOriginalServerId != null && haResendServerId != null && haOriginalServerId.equals(haResendServerId)) {
-			if (debug) {
-				log.debug(
-						"discard(haOriginalServerId.equals(haResendServerId)): haResendAgainServerId: {}, haResendServerId: {}, haResendAgainServerId: {}, address: {}",
-						haResendAgainServerId, haResendServerId, haResendAgainServerId, message.address());
-			}
+		if (isRetryOnce(message) && haOriginalServerId != null && haOriginalServerId.equals(haResendServerId)) {
 			return true; // had retry original server
 		}
 		return false;
@@ -332,13 +319,10 @@ public class PendingMessageProcessor {
 			// }
 			// }
 
-			String originalServerId = message.headers().get(HA_ORIGINAL_SERVER_ID_KEY);
-			if (originalServerId == null) {
-				message.headers().set(HA_ORIGINAL_SERVER_ID_KEY, failedServerID.toString());
-				message.headers().set(HA_RESEND_SERVER_ID_KEY, choosedServerID.toString());
+			if (isRetryOnce(message)) {
+				setRetryTwice(message, failedServerID, choosedServerID);
 			} else {
-				message.headers().set(HA_RESEND_SERVER_ID_KEY, failedServerID.toString());
-				message.headers().set(HA_RESEND_AGAIN_SERVER_ID_KEY, choosedServerID.toString());
+				setRetryOnce(message, failedServerID, choosedServerID);
 			}
 
 			ClusteredEventBusAPI.sendRemote(eventBus, choosedServerID, message);
@@ -347,11 +331,31 @@ public class PendingMessageProcessor {
 		return fu;
 	}
 
-	static public boolean isRetryMessage(Message<?> message) {
+	// =====
+	private void setRetryOnce(Message<?> message, ServerID failedServerID, ServerID choosedServerID) {
 		MultiMap headers = message.headers();
-		String haResendServerId = headers.get(HA_RESEND_SERVER_ID_KEY);
-		String haResendAgainServerId = headers.get(HA_RESEND_AGAIN_SERVER_ID_KEY);
-		return haResendServerId != null || haResendAgainServerId != null;
+		headers.set(HA_ORIGINAL_SERVER_ID_KEY, failedServerID.toString());
+		headers.set(HA_RESEND_SERVER_ID_KEY, choosedServerID.toString());
+	}
+
+	private void setRetryTwice(Message<?> message, ServerID failedServerID, ServerID choosedServerID) {
+		MultiMap headers = message.headers();
+		headers.set(HA_RESEND_SERVER_ID_KEY, failedServerID.toString());
+		headers.set(HA_RESEND_AGAIN_SERVER_ID_KEY, choosedServerID.toString());
+	}
+
+	private boolean isRetry(Message<?> message) {
+		MultiMap headers = message.headers();
+		return headers.get(HA_ORIGINAL_SERVER_ID_KEY) != null || headers.get(HA_RESEND_SERVER_ID_KEY) != null
+				|| headers.get(HA_RESEND_AGAIN_SERVER_ID_KEY) != null;
+	}
+
+	private boolean isRetryTwice(Message<?> message) {
+		return message.headers().get(HA_RESEND_AGAIN_SERVER_ID_KEY) != null;
+	}
+
+	private boolean isRetryOnce(Message<?> message) {
+		return message.headers().get(HA_ORIGINAL_SERVER_ID_KEY) != null;
 	}
 
 }

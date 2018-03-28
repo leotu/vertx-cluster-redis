@@ -33,7 +33,7 @@ import io.vertx.core.shareddata.impl.AsynchronousLock;
  * @see io.vertx.core.shareddata.impl.SharedDataImpl
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
-public class AsyncLocalLock {
+class AsyncLocalLock {
 	private static final Logger log = LoggerFactory.getLogger(AsyncLocalLock.class);
 
 	static private final ConcurrentMap<String, AsynchronousLock> localLocks = new ConcurrentHashMap<>();

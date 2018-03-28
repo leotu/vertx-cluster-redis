@@ -23,7 +23,7 @@ import org.redisson.client.protocol.Encoder;
  *
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
-public class KeyValueCodec implements Codec {
+class KeyValueCodec implements Codec {
 
 	private final Encoder valueEncoder;
 	private final Decoder<Object> valueDecoder;
