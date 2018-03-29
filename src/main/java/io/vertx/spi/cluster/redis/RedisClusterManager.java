@@ -18,7 +18,6 @@ package io.vertx.spi.cluster.redis;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
@@ -35,26 +34,17 @@ import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
 import io.vertx.core.eventbus.impl.clustered.ClusterNodeInfo;
-import io.vertx.core.eventbus.impl.clustered.ClusteredEventBus;
-import io.vertx.core.eventbus.impl.clustered.ClusteredMessage;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
-import io.vertx.core.net.impl.ServerID;
 import io.vertx.core.shareddata.AsyncMap;
 import io.vertx.core.shareddata.Counter;
 import io.vertx.core.shareddata.Lock;
 import io.vertx.core.spi.cluster.AsyncMultiMap;
 import io.vertx.core.spi.cluster.ClusterManager;
 import io.vertx.core.spi.cluster.NodeListener;
-import io.vertx.spi.cluster.redis.NonPublicAPI.ClusteredEventBusAPI;
-import io.vertx.spi.cluster.redis.NonPublicAPI.ClusteredEventBusAPI.ConnectionHolderAPI;
-import io.vertx.spi.cluster.redis.NonPublicAPI.LocalCached;
-import io.vertx.spi.cluster.redis.impl.LocalCachedAsyncMultiMap;
-import io.vertx.spi.cluster.redis.impl.RedisAsyncMap;
-import io.vertx.spi.cluster.redis.impl.RedisAsyncMultiMap;
-import io.vertx.spi.cluster.redis.impl.RedisAsyncMultiMapSubs;
-import io.vertx.spi.cluster.redis.impl.RedisMap;
-import io.vertx.spi.cluster.redis.impl.RedisMapHaInfo;
+import io.vertx.spi.cluster.redis.Factory.LocalCached;
+import io.vertx.spi.cluster.redis.Factory.NodeAttachListener;
+import io.vertx.spi.cluster.redis.impl.FactoryImpl;
 
 /**
  * https://github.com/redisson/redisson/wiki/11.-Redis-commands-mapping
@@ -65,17 +55,21 @@ import io.vertx.spi.cluster.redis.impl.RedisMapHaInfo;
 public class RedisClusterManager implements ClusterManager {
 	private static final Logger log = LoggerFactory.getLogger(RedisClusterManager.class);
 
+	private static final String CLUSTER_MAP_NAME = FactoryImpl.CLUSTER_MAP_NAME;
+	private static final String SUBS_MAP_NAME = FactoryImpl.SUBS_MAP_NAME;
+
+	private static final Factory factory = new FactoryImpl();
+
 	private Vertx vertx;
 	private final RedissonClient redisson;
 
 	private String nodeId;
-	private ClusteredEventBus eventBus;
 
 	private AtomicBoolean active = new AtomicBoolean();
 	private boolean disableTTL = false; // XXX
 	private NodeListener nodeListener;
 
-	private RedisMapHaInfo haInfo;
+	private Map<String, String> haInfo;
 	private final int haInfoTimeToLiveSeconds = disableTTL ? 0 : 10; // TTL seconds
 	private final int haInfoRefreshIntervalSeconds = 5; // TTL Refresh seconds
 
@@ -88,68 +82,11 @@ public class RedisClusterManager implements ClusterManager {
 	private ConcurrentMap<String, AsyncMap<?, ?>> asyncMapCache = new ConcurrentHashMap<>();
 	private ConcurrentMap<String, AsyncMultiMap<?, ?>> asyncMultiMapCache = new ConcurrentHashMap<>();
 
-	private static final String CLUSTER_MAP_NAME = NonPublicAPI.HA_CLUSTER_MAP_NAME;
-	private static final String SUBS_MAP_NAME = NonPublicAPI.EB_SUBS_MAP_NAME;
-
 	public RedisClusterManager(RedissonClient redisson, String nodeId) {
 		Objects.requireNonNull(redisson, "redisson");
 		Objects.requireNonNull(nodeId, "nodeId");
 		this.redisson = redisson;
 		this.nodeId = nodeId;
-	}
-
-	public RedissonClient getRedisson() {
-		return redisson;
-	}
-
-	private void readyEventBus(ClusteredEventBus eventBus, AsyncMultiMap<String, ClusterNodeInfo> subs) {
-		this.eventBus = eventBus;
-
-		@SuppressWarnings("unchecked")
-		final ConcurrentMap<ServerID, Object> oldOne = (ConcurrentMap<ServerID, Object>) ClusteredEventBusAPI
-				.connections(this.eventBus);
-
-		@SuppressWarnings("serial")
-		final ConcurrentMap<ServerID, Object> newOne = new ConcurrentHashMap<ServerID, Object>() {
-			PendingMessageProcessor pendingProcessor = new PendingMessageProcessor(vertx, RedisClusterManager.this, eventBus,
-					subs, this);
-
-			/**
-			 * @param key is ServerID type
-			 * @param value is ConnectionHolder type
-			 * @see io.vertx.core.eventbus.impl.clustered.ConnectionHolder#close
-			 */
-			@Override
-			public boolean remove(Object serverID, Object connHolder) {
-				boolean ok = super.remove(serverID, connHolder);
-				if (ok) {
-					Queue<ClusteredMessage<?, ?>> pending = ConnectionHolderAPI.pending(connHolder);
-					ServerID holderServerID = ConnectionHolderAPI.serverID(connHolder);
-					if (!serverID.equals(holderServerID)) {
-						throw new RuntimeException(
-								"(!serverID.equals(holderServerID), serverID: " + serverID + ", holderServerID: " + holderServerID);
-					}
-					if (pending != null && !pending.isEmpty()) {
-						Future<Void> fu = pendingProcessor.run((ServerID) serverID, pending);
-						fu.setHandler(ar -> {
-							if (ar.failed()) {
-								log.warn("serverID: {}, pendingProcessor error: {}", serverID, ar.cause().toString());
-							}
-						});
-					}
-					// else {
-					// log.debug("serverID: {}, pending.size: {}", serverID, pending == null ? "<null>" : pending.size());
-					// }
-				} else {
-					log.debug("skip pendingProcessor serverID: {}, removed failed: {}", serverID);
-				}
-				return ok;
-			}
-		};
-		ClusteredEventBusAPI.setConnections(this.eventBus, newOne); // reset to new Instance
-		if (!oldOne.isEmpty()) {
-			newOne.putAll(oldOne);
-		}
 	}
 
 	/**
@@ -169,17 +106,17 @@ public class RedisClusterManager implements ClusterManager {
 		vertx.executeBlocking(future -> {
 			if (name.equals(SUBS_MAP_NAME)) {
 				if (subs == null) {
-					subs = new RedisAsyncMultiMapSubs(vertx, this, redisson, name);
+					subs = factory.createAsyncMultiMapSubs(vertx, this, redisson, name);
 					if (enableCacheSubs) {
-						subs = new LocalCachedAsyncMultiMap<String, ClusterNodeInfo>(vertx, this, redisson, subs,
-								cacheSubsTimeoutInSecoinds, cacheSubsTopicName);
+						subs = factory.createLocalCachedAsyncMultiMap(vertx, this, redisson, subs, cacheSubsTimeoutInSecoinds,
+								cacheSubsTopicName);
 					}
-					readyEventBus(ClusteredEventBusAPI.eventBus(vertx), subs);
+					factory.createPendingMessageProcessor(vertx, this, subs); // XXX: EventBus ready been created
 				}
 				future.complete((AsyncMultiMap<K, V>) subs);
 			} else {
 				AsyncMultiMap<K, V> asyncMultiMap = (AsyncMultiMap<K, V>) asyncMultiMapCache.computeIfAbsent(name,
-						key -> new RedisAsyncMultiMap<K, V>(vertx, redisson, name));
+						key -> factory.createAsyncMultiMap(vertx, redisson, name));
 				future.complete(asyncMultiMap);
 			}
 
@@ -196,7 +133,7 @@ public class RedisClusterManager implements ClusterManager {
 		vertx.executeBlocking(future -> {
 			@SuppressWarnings("unchecked")
 			AsyncMap<K, V> asyncMap = (AsyncMap<K, V>) asyncMapCache.computeIfAbsent(name,
-					key -> new RedisAsyncMap<K, V>(vertx, redisson, name));
+					key -> factory.createAsyncMap(vertx, redisson, name));
 			future.complete(asyncMap);
 		}, resultHandler);
 	}
@@ -209,11 +146,12 @@ public class RedisClusterManager implements ClusterManager {
 	public <K, V> Map<K, V> getSyncMap(String name) {
 		if (name.equals(CLUSTER_MAP_NAME)) {
 			if (haInfo == null) {
-				haInfo = new RedisMapHaInfo(vertx, this, redisson, name, haInfoTimeToLiveSeconds, haInfoRefreshIntervalSeconds);
+				haInfo = factory.createMapHaInfo(vertx, this, redisson, name, haInfoTimeToLiveSeconds,
+						haInfoRefreshIntervalSeconds);
 			}
 			return (Map<K, V>) haInfo;
 		} else {
-			Map<K, V> map = (Map<K, V>) mapCache.computeIfAbsent(name, key -> new RedisMap<K, V>(vertx, redisson, name));
+			Map<K, V> map = (Map<K, V>) mapCache.computeIfAbsent(name, key -> factory.createMap(vertx, redisson, name));
 			return map;
 		}
 	}
@@ -283,7 +221,7 @@ public class RedisClusterManager implements ClusterManager {
 				nodeListener.nodeLeft(nodeId);
 			}
 		};
-		this.haInfo.attachListener(this.nodeListener);
+		((NodeAttachListener) this.haInfo).attachListener(this.nodeListener);
 	}
 
 	// private void startLocalMapCache() {

@@ -28,6 +28,7 @@ import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.spi.cluster.ClusterManager;
 import io.vertx.core.spi.cluster.NodeListener;
+import io.vertx.spi.cluster.redis.Factory.NodeAttachListener;
 
 /**
  * CLUSTER_MAP_NAME = "__vertx.haInfo"
@@ -37,7 +38,7 @@ import io.vertx.core.spi.cluster.NodeListener;
  * 
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
-public class RedisMapHaInfo extends RedisMap<String, String> {
+class RedisMapHaInfo extends RedisMap<String, String> implements NodeAttachListener {
 	private static final Logger log = LoggerFactory.getLogger(RedisMapHaInfo.class);
 
 	private final int timeToLiveSeconds;
@@ -71,6 +72,7 @@ public class RedisMapHaInfo extends RedisMap<String, String> {
 		return timeToLiveSeconds;
 	}
 
+	@Override
 	public void attachListener(NodeListener nodeListener) {
 		ttlMonitor.attachListener(nodeListener);
 	}

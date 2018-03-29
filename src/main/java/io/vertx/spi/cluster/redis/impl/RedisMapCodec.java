@@ -46,7 +46,7 @@ import io.vertx.core.shareddata.impl.ClusterSerializable;
  * @see org.redisson.codec.FstCodec
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
-public class RedisMapCodec implements Codec {
+class RedisMapCodec implements Codec {
 	private static final Logger log = LoggerFactory.getLogger(RedisMapCodec.class);
 
 	private final Encoder encoder = new Encoder() {

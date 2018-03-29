@@ -13,7 +13,7 @@
  *
  * You may elect to redistribute this code under either of these licenses.
  */
-package io.vertx.spi.cluster.redis;
+package io.vertx.spi.cluster.redis.impl;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -39,16 +39,17 @@ import io.vertx.core.net.impl.ServerID;
 import io.vertx.core.spi.cluster.AsyncMultiMap;
 import io.vertx.core.spi.cluster.ChoosableIterable;
 import io.vertx.core.spi.cluster.ClusterManager;
-import io.vertx.spi.cluster.redis.NonPublicAPI.ClusteredEventBusAPI;
-import io.vertx.spi.cluster.redis.NonPublicAPI.ClusteredEventBusAPI.ConnectionHolderAPI;
+import io.vertx.spi.cluster.redis.Factory.PendingMessageProcessor;
+import io.vertx.spi.cluster.redis.impl.NonPublicAPI.ClusteredEventBusAPI;
+import io.vertx.spi.cluster.redis.impl.NonPublicAPI.ClusteredEventBusAPI.ConnectionHolderAPI;
 
 /**
  * Tryable to choose another server ID
  * 
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
-class PendingMessageProcessor {
-	private static final Logger log = LoggerFactory.getLogger(PendingMessageProcessor.class);
+class PendingMessageProcessorImpl implements PendingMessageProcessor {
+	private static final Logger log = LoggerFactory.getLogger(PendingMessageProcessorImpl.class);
 
 	final static private String HA_ORIGINAL_SERVER_ID_KEY = "__HA_ORIGINAL_SERVER_ID";
 	final static private String HA_RESEND_SERVER_ID_KEY = "__HA_RESEND_SERVER_ID";
@@ -66,7 +67,7 @@ class PendingMessageProcessor {
 	private final ClusterManager clusterManager;
 	private final ConcurrentMap<ServerID, Object> connections; // <ServerID, ConnectionHolder>
 
-	public PendingMessageProcessor(Vertx vertx, ClusterManager clusterManager, ClusteredEventBus eventBus,
+	public PendingMessageProcessorImpl(Vertx vertx, ClusterManager clusterManager, ClusteredEventBus eventBus,
 			AsyncMultiMap<String, ClusterNodeInfo> subs, ConcurrentMap<ServerID, Object> connections) {
 		this.vertx = vertx;
 		this.clusterManager = clusterManager;
@@ -76,23 +77,42 @@ class PendingMessageProcessor {
 		this.connections = connections;
 	}
 
+	@Override
+	public void run(Object failedServerID, Object connHolder) {
+		Objects.requireNonNull(failedServerID, "failedServerID");
+		Objects.requireNonNull(connHolder, "connHolder");
+
+		if (this.selfServerID == null) {
+			this.selfServerID = ClusteredEventBusAPI.serverID(this.eventBus);
+		}
+
+		Queue<ClusteredMessage<?, ?>> pending = ConnectionHolderAPI.pending(connHolder);
+		ServerID holderServerID = ConnectionHolderAPI.serverID(connHolder);
+		if (!failedServerID.equals(holderServerID)) {
+			throw new RuntimeException("(!failedServerID.equals(holderServerID), serverID: " + failedServerID
+					+ ", holderServerID: " + holderServerID);
+		}
+		if (pending != null && !pending.isEmpty()) {
+			Future<Void> fu = process((ServerID) failedServerID, pending);
+			fu.setHandler(ar -> {
+				if (ar.failed()) {
+					log.warn("failedServerID: {}, pendingProcessor error: {}", failedServerID, ar.cause().toString());
+				}
+			});
+		} else {
+			log.debug("failedServerID: {}, pending.size: {}", failedServerID, pending == null ? "<null>" : pending.size());
+		}
+	}
+
 	/**
 	 * 
 	 * @param serverID failedServerID
 	 */
 	@SuppressWarnings({ "rawtypes", "unchecked" })
-	public Future<Void> run(ServerID failedServerID, Queue<ClusteredMessage<?, ?>> pending) {
-		if (this.selfServerID == null) {
-			this.selfServerID = ClusteredEventBusAPI.serverID(this.eventBus);
-		}
+
+	private Future<Void> process(ServerID failedServerID, Queue<ClusteredMessage<?, ?>> pending) {
 		Objects.requireNonNull(failedServerID, "failedServerID");
 		Objects.requireNonNull(pending, "pending");
-		if (pending.isEmpty()) {
-			if (debug) {
-				log.debug("(pending.isEmpty()), failedServerID: {}", failedServerID);
-			}
-			return Future.succeededFuture();
-		}
 
 		int pendingSize = pending.size();
 		Queue<Future> runStatusFutures = new ArrayDeque<>(pendingSize);

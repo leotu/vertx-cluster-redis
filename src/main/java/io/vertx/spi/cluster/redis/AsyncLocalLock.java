@@ -41,7 +41,7 @@ class AsyncLocalLock {
 	/**
 	 * ignore any error
 	 */
-	static public void executeBlocking(Vertx vertx, String key, int timeoutInSeconds, Runnable executor) {
+	static void executeBlocking(Vertx vertx, String key, int timeoutInSeconds, Runnable executor) {
 		acquireLockWithTimeout(vertx, key, timeoutInSeconds, lock -> {
 			vertx.executeBlocking(future -> {
 				try {
@@ -73,7 +73,7 @@ class AsyncLocalLock {
 		});
 	}
 
-	static public void executeBlocking(Vertx vertx, String key, int timeoutInSeconds, Runnable executor,
+	static void executeBlocking(Vertx vertx, String key, int timeoutInSeconds, Runnable executor,
 			Consumer<Throwable> error) {
 		acquireLockWithTimeout(vertx, key, timeoutInSeconds, lock -> {
 			vertx.executeBlocking(future -> {
@@ -96,7 +96,7 @@ class AsyncLocalLock {
 	/**
 	 * ignore any error
 	 */
-	static public void execute(Vertx vertx, String key, int timeoutInSeconds, Runnable executor) {
+	static void execute(Vertx vertx, String key, int timeoutInSeconds, Runnable executor) {
 		acquireLockWithTimeout(vertx, key, timeoutInSeconds, lock -> {
 			try {
 				executor.run();
@@ -115,8 +115,7 @@ class AsyncLocalLock {
 		});
 	}
 
-	static public void execute(Vertx vertx, String key, int timeoutInSeconds, Runnable executor,
-			Consumer<Throwable> error) {
+	static void execute(Vertx vertx, String key, int timeoutInSeconds, Runnable executor, Consumer<Throwable> error) {
 		acquireLockWithTimeout(vertx, key, timeoutInSeconds, lock -> {
 			try {
 				executor.run();
@@ -131,7 +130,7 @@ class AsyncLocalLock {
 	/**
 	 * @see io.vertx.core.shareddata.impl.SharedDataImpl#getLockWithTimeout
 	 */
-	static public void acquireLockWithTimeout(Vertx vertx, String key, int timeoutInSeconds,
+	static void acquireLockWithTimeout(Vertx vertx, String key, int timeoutInSeconds,
 			Handler<io.vertx.core.shareddata.Lock> resultHandler, Handler<Throwable> errorHandler) {
 		acquireLockWithTimeout(vertx, key, timeoutInSeconds, ar -> {
 			if (ar.failed()) {
@@ -145,14 +144,14 @@ class AsyncLocalLock {
 	/**
 	 * @see io.vertx.core.shareddata.impl.AsynchronousLock#release
 	 */
-	static public void releaseLock(io.vertx.core.shareddata.Lock lock) {
+	static void releaseLock(io.vertx.core.shareddata.Lock lock) {
 		lock.release();
 	}
 
 	/**
 	 * @see io.vertx.core.shareddata.impl.SharedDataImpl#getLocalLock
 	 */
-	static public void acquireLockWithTimeout(Vertx vertx, String key, int timeoutInSeconds,
+	static void acquireLockWithTimeout(Vertx vertx, String key, int timeoutInSeconds,
 			Handler<AsyncResult<Lock>> resultHandler) {
 		AsynchronousLock lock = localLocks.computeIfAbsent(key, n -> new AsynchronousLock(vertx));
 		lock.acquire(timeoutInSeconds * 1000, resultHandler);

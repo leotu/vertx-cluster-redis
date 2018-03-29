@@ -34,13 +34,13 @@ import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.spi.cluster.AsyncMultiMap;
 import io.vertx.core.spi.cluster.ChoosableIterable;
 import io.vertx.core.spi.cluster.ClusterManager;
-import io.vertx.spi.cluster.redis.NonPublicAPI.LocalCached;
+import io.vertx.spi.cluster.redis.Factory.LocalCached;
 
 /**
  *
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
-public class LocalCachedAsyncMultiMap<K, V> implements AsyncMultiMap<K, V>, LocalCached {
+class LocalCachedAsyncMultiMap<K, V> implements AsyncMultiMap<K, V>, LocalCached {
 	private static final Logger log = LoggerFactory.getLogger(LocalCachedAsyncMultiMap.class);
 
 	private final AsyncMultiMap<K, V> delegate;

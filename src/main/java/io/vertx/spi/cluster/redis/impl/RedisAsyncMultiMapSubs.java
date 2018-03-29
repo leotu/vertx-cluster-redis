@@ -50,7 +50,7 @@ import io.vertx.core.spi.cluster.ClusterManager;
  * 
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
-public class RedisAsyncMultiMapSubs extends RedisAsyncMultiMap<String, ClusterNodeInfo> {
+class RedisAsyncMultiMapSubs extends RedisAsyncMultiMap<String, ClusterNodeInfo> {
 	private static final Logger log = LoggerFactory.getLogger(RedisAsyncMultiMapSubs.class);
 
 	@SuppressWarnings("unused")

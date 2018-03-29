@@ -38,8 +38,8 @@ import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.spi.cluster.ClusterManager;
 import io.vertx.core.spi.cluster.NodeListener;
-import io.vertx.spi.cluster.redis.NonPublicAPI;
-import io.vertx.spi.cluster.redis.NonPublicAPI.ClusteredEventBusAPI;
+import io.vertx.spi.cluster.redis.Factory.NodeAttachListener;
+import io.vertx.spi.cluster.redis.impl.NonPublicAPI.ClusteredEventBusAPI;
 
 /**
  * TTL: "__vertx.haInfo"
@@ -48,7 +48,7 @@ import io.vertx.spi.cluster.redis.NonPublicAPI.ClusteredEventBusAPI;
  * @see org.redisson.api.RedissonClient#getExecutorService
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
-class RedisMapHaInfoTTLMonitor {
+class RedisMapHaInfoTTLMonitor implements NodeAttachListener {
 	private static final Logger log = LoggerFactory.getLogger(RedisMapHaInfoTTLMonitor.class);
 
 	final private int refreshIntervalSeconds;
@@ -86,7 +86,7 @@ class RedisMapHaInfoTTLMonitor {
 	 * @see io.vertx.core.impl.HAManager#nodeAdded
 	 * @see io.vertx.core.impl.HAManager#nodeLeft
 	 */
-	protected void attachListener(NodeListener nodeListener) {
+	public void attachListener(NodeListener nodeListener) {
 		if (removedListeneId == 0) {
 			removedListeneId = mapAsync.addListener(new EntryRemovedListener<String, String>() {
 				@Override

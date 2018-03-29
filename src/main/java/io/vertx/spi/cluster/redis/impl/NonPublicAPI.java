@@ -13,7 +13,7 @@
  *
  * You may elect to redistribute this code under either of these licenses.
  */
-package io.vertx.spi.cluster.redis;
+package io.vertx.spi.cluster.redis.impl;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -44,7 +44,7 @@ import io.vertx.core.spi.cluster.ClusterManager;
  * 
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
-public class NonPublicAPI {
+class NonPublicAPI {
 	// private static final Logger log = LoggerFactory.getLogger(NonPublicAPI.class);
 
 	public static final String HA_CLUSTER_MAP_NAME; // "__vertx.haInfo"
@@ -55,10 +55,6 @@ public class NonPublicAPI {
 		HA_CLUSTER_MAP_NAME = Reflection.getStaticFinalField(HAManager.class, "CLUSTER_MAP_NAME");
 		EB_SERVER_ID_HA_KEY = Reflection.getStaticFinalField(ClusteredEventBus.class, "SERVER_ID_HA_KEY");
 		EB_SUBS_MAP_NAME = Reflection.getStaticFinalField(ClusteredEventBus.class, "SUBS_MAP_NAME");
-	}
-
-	static public interface LocalCached {
-		void discard();
 	}
 
 	/**

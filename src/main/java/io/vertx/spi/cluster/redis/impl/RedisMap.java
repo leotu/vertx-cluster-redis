@@ -29,7 +29,7 @@ import io.vertx.core.Vertx;
  *
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
-public class RedisMap<K, V> implements Map<K, V> {
+class RedisMap<K, V> implements Map<K, V> {
 
 	protected final Vertx vertx;
 	protected final RMap<K, V> map;

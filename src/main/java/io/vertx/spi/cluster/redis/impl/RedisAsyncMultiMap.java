@@ -48,7 +48,7 @@ import io.vertx.core.spi.cluster.ChoosableIterable;
  * @see org.redisson.RedissonSetMultimapValues
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
-public class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
+class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 	private static final Logger log = LoggerFactory.getLogger(RedisAsyncMultiMap.class);
 
 	protected ConcurrentMap<K, AtomicReference<V>> choosableSetPtr = new ConcurrentHashMap<>();

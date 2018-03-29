@@ -45,13 +45,13 @@ import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
 import io.vertx.core.shareddata.AsyncMap;
 import io.vertx.spi.cluster.redis.ExpirableAsync;
-import io.vertx.spi.cluster.redis.NonPublicAPI.Reflection;
+import io.vertx.spi.cluster.redis.impl.NonPublicAPI.Reflection;
 
 /**
  *
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
-public class RedisAsyncMap<K, V> implements AsyncMap<K, V>, ExpirableAsync<K> {
+class RedisAsyncMap<K, V> implements AsyncMap<K, V>, ExpirableAsync<K> {
 	// private static final Logger log = LoggerFactory.getLogger(RedisAsyncMap.class);
 
 	protected final RedisStrictCommand<Long> ZSCORE_LONG = new RedisStrictCommand<Long>("ZSCORE",
