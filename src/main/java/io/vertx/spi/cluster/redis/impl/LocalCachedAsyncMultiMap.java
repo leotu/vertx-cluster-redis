@@ -46,8 +46,9 @@ class LocalCachedAsyncMultiMap<K, V> implements AsyncMultiMap<K, V>, LocalCached
 	private final AsyncMultiMap<K, V> delegate;
 	private final Vertx vertx;
 	private final ClusterManager clusterManager;
+	protected final String topicName;
 
-	protected ConcurrentMap<K, ChoosableIterable<V>> choosableSetLocalCached = new ConcurrentHashMap<>();
+	protected final ConcurrentMap<K, ChoosableIterable<V>> choosableSetLocalCached = new ConcurrentHashMap<>();
 
 	protected RTopic<K> subsTopic;
 	protected int topicListenerId;
@@ -59,7 +60,8 @@ class LocalCachedAsyncMultiMap<K, V> implements AsyncMultiMap<K, V>, LocalCached
 		this.vertx = vertx;
 		this.clusterManager = clusterManager;
 		this.delegate = delegate;
-		this.subsTopic = redisson.getTopic(topicName);
+		this.topicName = topicName;
+		this.subsTopic = redisson.getTopic(this.topicName);
 		this.topicListenerId = this.subsTopic.addListener(new MessageListener<K>() {
 			@Override
 			public void onMessage(String channel, K key) {
@@ -185,6 +187,11 @@ class LocalCachedAsyncMultiMap<K, V> implements AsyncMultiMap<K, V>, LocalCached
 				log.warn("{}({}), error: {}", method, k, error.toString());
 			}
 		});
+	}
+
+	@Override
+	public String toString() {
+		return delegate.toString() + "{topicName=" + topicName + "}";
 	}
 
 }

@@ -17,6 +17,7 @@ package io.vertx.spi.cluster.redis.impl;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Queue;
@@ -46,16 +47,16 @@ import io.vertx.spi.cluster.redis.impl.NonPublicAPI.ClusteredEventBusAPI.Connect
 /**
  * Tryable to choose another server ID
  * 
+ * @see io.vertx.core.eventbus.impl.clustered.ConnectionHolder#close
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
 class PendingMessageProcessorImpl implements PendingMessageProcessor {
 	private static final Logger log = LoggerFactory.getLogger(PendingMessageProcessorImpl.class);
 
-	final static private String HA_ORIGINAL_SERVER_ID_KEY = "__HA_ORIGINAL_SERVER_ID";
-	final static private String HA_RESEND_SERVER_ID_KEY = "__HA_RESEND_SERVER_ID";
-	final static private String HA_RESEND_AGAIN_SERVER_ID_KEY = "__HA_RESEND_AGAIN_SERVER_ID";
+	final static private String HA_RETRY_SERVER_ID_KEY = "__HA_RETRY_SERVER_ID";
+	final static private String HA_RETRY_DISCARD_MESSAGE_KEY = "__HA_RETRY_DISCARD_MESSAGE";
 
-	private boolean debug = false;
+	private static boolean debug = false;
 
 	private final Vertx vertx;
 	private final ClusteredEventBus eventBus;
@@ -79,12 +80,11 @@ class PendingMessageProcessorImpl implements PendingMessageProcessor {
 
 	@Override
 	public void run(Object failedServerID, Object connHolder) {
-		Objects.requireNonNull(failedServerID, "failedServerID");
-		Objects.requireNonNull(connHolder, "connHolder");
-
 		if (this.selfServerID == null) {
 			this.selfServerID = ClusteredEventBusAPI.serverID(this.eventBus);
 		}
+		Objects.requireNonNull(failedServerID, "failedServerID");
+		Objects.requireNonNull(connHolder, "connHolder");
 
 		Queue<ClusteredMessage<?, ?>> pending = ConnectionHolderAPI.pending(connHolder);
 		ServerID holderServerID = ConnectionHolderAPI.serverID(connHolder);
@@ -99,7 +99,7 @@ class PendingMessageProcessorImpl implements PendingMessageProcessor {
 					log.warn("failedServerID: {}, pendingProcessor error: {}", failedServerID, ar.cause().toString());
 				}
 			});
-		} else {
+		} else if (debug) {
 			log.debug("failedServerID: {}, pending.size: {}", failedServerID, pending == null ? "<null>" : pending.size());
 		}
 	}
@@ -139,23 +139,24 @@ class PendingMessageProcessorImpl implements PendingMessageProcessor {
 				ClusteredMessage<?, ?> cmessage = message;
 				resend(failedServerID, message).setHandler(ar -> {
 					if (ar.failed()) {
-						log.debug(
-								"failed {} to retry {} message, address: {}, replyAddress:{}, isSend:{}, isFromWire:{}, error: {}",
+						log.warn("Failed {} to retry {} message, address: {}, replyAddress:{}, isFromWire:{}, error: {}",
 								cmessage.isSend() ? "send" : "publish", failedServerID, cmessage.address(), cmessage.replyAddress(),
 								cmessage.isFromWire(), ar.cause().toString());
 						runStatusFuture.fail(ar.cause());
 					} else {
 						if (!ar.result()) {
-							log.debug(
-									"failed {} to retry {} message, address: {}, replyAddress:{}, isSend:{}, isFromWire:{}, no available serverID.",
-									cmessage.isSend() ? "send" : "publish", failedServerID, cmessage.address(), cmessage.replyAddress(),
-									cmessage.isFromWire());
+							if (debug) {
+								log.debug(
+										"failed {} to retry {} message, address: {}, replyAddress:{}, isFromWire:{}, no available serverID.",
+										cmessage.isSend() ? "send" : "publish", failedServerID, cmessage.address(), cmessage.replyAddress(),
+										cmessage.isFromWire());
+							}
 						}
 						runStatusFuture.complete(ar.result() ? 1 : 0);
 					}
 				});
 			} else {
-				log.debug("discard {} to retry {} message, address: {}, replyAddress:{}, isSend:{}, isFromWire:{}",
+				log.warn("Discard {} to retry {} message, address: {}, replyAddress:{}, isFromWire:{}",
 						message.isSend() ? "send" : "publish", failedServerID, message.address(), message.replyAddress(),
 						message.isFromWire());
 				runStatusFuture.complete(-1);
@@ -203,6 +204,9 @@ class PendingMessageProcessorImpl implements PendingMessageProcessor {
 
 	private boolean discard(ClusteredMessage<?, ?> message) {
 		if (!message.isSend()) { // skip Publish
+			if (debug) {
+				log.debug("(!message.isSend())");
+			}
 			return true;
 		}
 		if (message.isFromWire()) { // skip readFromWire
@@ -211,19 +215,11 @@ class PendingMessageProcessorImpl implements PendingMessageProcessor {
 			}
 			return true;
 		}
-		if (!isRetry(message)) {
-			return false;
-		}
-		if (isRetryTwice(message)) { // had retry 2 times
-			return true;
-		}
-
-		String haOriginalServerId = message.headers().get(HA_ORIGINAL_SERVER_ID_KEY);
-		String haResendServerId = message.headers().get(HA_RESEND_SERVER_ID_KEY);
-		if (isRetryOnce(message) && haOriginalServerId != null && haOriginalServerId.equals(haResendServerId)) {
-			return true; // had retry original server
-		}
-		return false;
+		// if (retryTimes(message) == 0) {
+		// return false;
+		// } else {
+		return isDiscardMessage(message);
+		// }
 	}
 
 	private Future<Boolean> resend(ServerID failedServerID, ClusteredMessage<?, ?> message) {
@@ -253,7 +249,7 @@ class PendingMessageProcessorImpl implements PendingMessageProcessor {
 		// if (Vertx.currentContext() == null) {
 		// Guarantees the order when there is no current context ?
 		// sendNoContext.runOnContext(v -> {
-		subs.get(address, resultHandler);
+		subs.get(address, resultHandler); // create new RedisChoosableSet
 		// });
 		// } else {
 		// subs.get(address, resultHandler);
@@ -270,112 +266,146 @@ class PendingMessageProcessorImpl implements PendingMessageProcessor {
 	private Future<Void> resendToSubs(ServerID failedServerID, ClusteredMessage<?, ?> message,
 			ChoosableIterable<ClusterNodeInfo> subs) {
 		Future<Void> fu = Future.future();
+
 		vertx.executeBlocking(future -> {
-			ClusterNodeInfo ci = subs.choose();
+			ClusterNodeInfo ci;
 			ServerID choosedServerID = null;
 			ServerID pendingServerID = null;
 			ServerID localServerID = null;
-			while ((ci = subs.choose()) != null) {
-				ServerID nextId = ci.serverID;
-				if (!nextId.equals(failedServerID) && !nextId.equals(selfServerID)) {
-					Object connHolder = connections.get(nextId);
-					if (connHolder == null) { // new open
-						choosedServerID = nextId;
-						break;
-					} else { // existing
-						Queue<ClusteredMessage<?, ?>> pending = ConnectionHolderAPI.pending(connHolder);
-						ServerID holderServerID = ConnectionHolderAPI.serverID(connHolder);
-						if (!nextId.equals(holderServerID)) {
-							throw new RuntimeException(
-									"(!nextId.equals(holderServerID), nextId: " + nextId + ", holderServerID: " + holderServerID);
-						}
-						if (pending == null || pending.isEmpty()) { // not pending node
-							choosedServerID = nextId;
-							break;
-						} else if (pending != null) {
-							pendingServerID = nextId; // nextId is pending node
-						}
+
+			boolean repeatFailedServer = false;
+			int repeatRetryServers = 0;
+			boolean repeatLocalServer = false;
+			boolean pendingServerServer = false;
+			while ((ci = subs.choose()) != null) { // Choose one
+				ServerID next = ci.serverID;
+				if (next.equals(failedServerID)) {
+					if (debug) {
+						log.debug("^^^ (next.equals(failedServerID)), next: {}", next);
 					}
-				} else if (nextId.equals(selfServerID)) {
-					if (localServerID != null && localServerID.equals(nextId)) {
-						// log.debug(
-						// "(localServerID != null && localServerID.equals(nextId)), nextId: {}, failedServerID: {}, selfServerID:
-						// {}",
-						// nextId, failedServerID, selfServerID);
+					if (repeatFailedServer) {
 						break;
-					} else {
-						localServerID = nextId;
+					}
+					repeatFailedServer = true;
+				} else if (next.equals(selfServerID)) {
+					localServerID = next;
+					if (debug) {
+						log.debug("^^^ (next.equals(selfServerID)), next: {}", next);
+					}
+					if (repeatLocalServer) {
+						break;
+					}
+					repeatLocalServer = true;
+				} else if (inRetryServerList(message, next)) {
+					if (debug) {
+						log.debug("^^^ (inRetryServerList(message, next)), next: {}, retryServers: {}, repeatRetryServers:{}", next,
+								getRetryServerList(message), repeatRetryServers);
+					}
+					if (repeatRetryServers > getRetryServerList(message).size()) {
+						break;
+					}
+					repeatRetryServers++;
+					continue;
+				} else {
+					Object connHolder = connections.get(next);
+					if (connHolder == null) { // new open
+						choosedServerID = next;
+						break;
+					} else { // exist
+						Queue<ClusteredMessage<?, ?>> pending = ConnectionHolderAPI.pending(connHolder);
+						if (pending == null || pending.isEmpty()) { // not pending node
+							choosedServerID = next;
+							break;
+						} else {
+							pendingServerID = next; // next is pending node
+							if (debug) {
+								log.debug("^^^ pendingServerID = next, next: {}", next);
+							}
+							if (pendingServerServer) {
+								break;
+							}
+							pendingServerServer = true;
+						}
 					}
 				}
-
 			}
 
+			int currentRetryTimes = retryTimes(message);
 			if (choosedServerID == null) { // not found available server ID
-				choosedServerID = pendingServerID != null ? pendingServerID : failedServerID;
-				if (choosedServerID.equals(failedServerID) && localServerID != null) {
-					choosedServerID = localServerID; // change to localServerID ?
+				if (localServerID != null) {
+					choosedServerID = localServerID;
 					if (debug) {
-						log.debug("new one not found, change to local server: {}, address: '{}'", choosedServerID,
-								message.address());
+						log.debug(
+								"*** new one not found, switch to local server: {}, current retry times: {}, address: '{}', body: {}",
+								choosedServerID, currentRetryTimes, message.address(), message.body());
+					}
+				} else if (pendingServerID != null) {
+					choosedServerID = pendingServerID;
+					if (debug) {
+						log.debug(
+								"*** new one not found, switch to pending server: {}, current retry times: {}, address: '{}', body: {}",
+								choosedServerID, currentRetryTimes, message.address(), message.body());
 					}
 				} else {
-					if (choosedServerID.equals(failedServerID)) {
-						if (debug) {
-							log.debug("new one not found, return to failed server: {}, address: '{}'", choosedServerID,
-									message.address());
-						}
-					} else {
-						if (debug) {
-							log.debug("new one not found, change to pending server: {}, address: '{}'", choosedServerID,
-									message.address());
-						}
+					choosedServerID = failedServerID;
+					if (debug) {
+						log.debug(
+								"*** new one not found, switch to failed server: {}, current retry times: {}, address: '{}', body: {}",
+								choosedServerID, currentRetryTimes, message.address(), message.body());
 					}
 				}
-			}
-			// else {
-			// if (debug) {
-			// log.debug("switch to new server: {}, previous failed server: {}, address: '{}'", choosedServerID,
-			// failedServerID, message.address());
-			// }
-			// }
-
-			if (isRetryOnce(message)) {
-				setRetryTwice(message, failedServerID, choosedServerID);
 			} else {
-				setRetryOnce(message, failedServerID, choosedServerID);
+				if (debug) {
+					log.debug(
+							"*** new one found, switch to new server: {} and failed server: {}, current retry times: {}, address: '{}', body: {}",
+							choosedServerID, failedServerID, currentRetryTimes, message.address(), message.body());
+				}
 			}
 
-			ClusteredEventBusAPI.sendRemote(eventBus, choosedServerID, message);
-			future.complete();
-		}, fu);
+			if (!inRetryServerList(message, choosedServerID)) {
+				appendRetryServer(message, choosedServerID);
+				ClusteredEventBusAPI.sendRemote(eventBus, choosedServerID, message);
+				future.complete();
+			} else {
+				markDiscardMessage(message, choosedServerID);
+				future.fail("No one can be choose, retry servers: " + getRetryServerList(message));
+			}
+		}, false, fu); // executed in parallel
 		return fu;
+
 	}
 
 	// =====
-	private void setRetryOnce(Message<?> message, ServerID failedServerID, ServerID choosedServerID) {
+	private boolean isDiscardMessage(Message<?> message) {
+		return message.headers().contains(HA_RETRY_DISCARD_MESSAGE_KEY);
+	}
+
+	private void markDiscardMessage(Message<?> message, ServerID choosedServerID) {
+		message.headers().set(HA_RETRY_DISCARD_MESSAGE_KEY, choosedServerID.toString());
+	}
+
+	private void appendRetryServer(Message<?> message, ServerID choosedServerID) {
 		MultiMap headers = message.headers();
-		headers.set(HA_ORIGINAL_SERVER_ID_KEY, failedServerID.toString());
-		headers.set(HA_RESEND_SERVER_ID_KEY, choosedServerID.toString());
+		if (retryTimes(message) == 0) {
+			headers.set(HA_RETRY_SERVER_ID_KEY, choosedServerID.toString());
+		} else {
+			headers.set(HA_RETRY_SERVER_ID_KEY, headers.get(HA_RETRY_SERVER_ID_KEY) + "," + choosedServerID.toString());
+		}
+		if (debug) {
+			log.debug("appendRetryServer: {}", headers.get(HA_RETRY_SERVER_ID_KEY));
+		}
 	}
 
-	private void setRetryTwice(Message<?> message, ServerID failedServerID, ServerID choosedServerID) {
-		MultiMap headers = message.headers();
-		headers.set(HA_RESEND_SERVER_ID_KEY, failedServerID.toString());
-		headers.set(HA_RESEND_AGAIN_SERVER_ID_KEY, choosedServerID.toString());
+	private int retryTimes(Message<?> message) {
+		return getRetryServerList(message).size();
 	}
 
-	private boolean isRetry(Message<?> message) {
-		MultiMap headers = message.headers();
-		return headers.get(HA_ORIGINAL_SERVER_ID_KEY) != null || headers.get(HA_RESEND_SERVER_ID_KEY) != null
-				|| headers.get(HA_RESEND_AGAIN_SERVER_ID_KEY) != null;
+	private List<String> getRetryServerList(Message<?> message) {
+		String serverList = message.headers().get(HA_RETRY_SERVER_ID_KEY);
+		return Arrays.asList(serverList == null ? new String[0] : serverList.split(","));
 	}
 
-	private boolean isRetryTwice(Message<?> message) {
-		return message.headers().get(HA_RESEND_AGAIN_SERVER_ID_KEY) != null;
+	private boolean inRetryServerList(Message<?> message, ServerID serverID) {
+		return getRetryServerList(message).contains(serverID.toString());
 	}
-
-	private boolean isRetryOnce(Message<?> message) {
-		return message.headers().get(HA_ORIGINAL_SERVER_ID_KEY) != null;
-	}
-
 }

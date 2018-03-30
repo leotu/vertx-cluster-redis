@@ -50,17 +50,20 @@ import io.vertx.core.spi.cluster.ChoosableIterable;
  */
 class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 	private static final Logger log = LoggerFactory.getLogger(RedisAsyncMultiMap.class);
+	private static boolean debug = false;
 
-	protected ConcurrentMap<K, AtomicReference<V>> choosableSetPtr = new ConcurrentHashMap<>();
+	protected ConcurrentMap<K, AtomicReference<RedisChoosableSet<V>>> choosableSetPtr = new ConcurrentHashMap<>();
 	protected final RedissonClient redisson;
 	protected final Vertx vertx;
 	protected final RSetMultimap<K, V> mmap;
+	protected final String name;
 
 	public RedisAsyncMultiMap(Vertx vertx, RedissonClient redisson, String name) {
 		Objects.requireNonNull(redisson, "redisson");
 		Objects.requireNonNull(name, "name");
 		this.vertx = vertx;
 		this.redisson = redisson;
+		this.name = name;
 		this.mmap = createMultimap(this.redisson, name);
 	}
 
@@ -81,19 +84,39 @@ class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 		);
 	}
 
+	/**
+	 * @see io.vertx.core.eventbus.impl.clustered.ClusteredEventBus#sendOrPub(SendContextImpl<T>)
+	 */
 	@Override
 	public void get(K k, Handler<AsyncResult<ChoosableIterable<V>>> resultHandler) {
 		Context context = vertx.getOrCreateContext();
-		mmap.getAllAsync(k).whenComplete((v, e) -> { // java.util.LinkedHashSet
+		mmap.getAllAsync(k).whenComplete((v, e) -> { // v class is java.util.LinkedHashSet
 			if (e != null) {
 				context.runOnContext(vd -> resultHandler.handle(Future.failedFuture(e)));
 			} else {
-				RedisChoosableSet<V> values = new RedisChoosableSet<>(v != null ? v.size() : 0, getCurrentPointer(k));
-				values.addAll(v);
-				values.moveToCurrent();
-				context.runOnContext(vd -> resultHandler.handle(Future.succeededFuture(values)));
+				AtomicReference<RedisChoosableSet<V>> currentRef = getCurrentRef(k);
+				RedisChoosableSet<V> newSet = new RedisChoosableSet<>(v, currentRef);
+				RedisChoosableSet<V> current = currentRef.get();
+				if (current != null) {
+					synchronized (current) {
+						if (current.equals(newSet)) {
+							if (debug) {
+								log.debug("(current.equals(newSet)), current: {}", current);
+							}
+							context.runOnContext(vd -> resultHandler.handle(Future.succeededFuture(current)));
+							return;
+						}
+					}
+				}
+				if (debug) {
+					log.debug("### current.size: {}, current: {}; newSet.size:{}, newSet: {}",
+							current == null ? "<null>" : current.size(), current, newSet.size(), newSet);
+				}
+				newSet.moveToCurrent();
+				context.runOnContext(vd -> resultHandler.handle(Future.succeededFuture(newSet)));
 			}
 		});
+
 	}
 
 	@Override
@@ -202,16 +225,38 @@ class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 		});
 	}
 
-	private AtomicReference<V> getCurrentPointer(K k) {
-		AtomicReference<V> current = choosableSetPtr.get(k);
-		if (current == null) {
-			current = new AtomicReference<>();
-			AtomicReference<V> previous = choosableSetPtr.putIfAbsent(k, current);
+	private AtomicReference<RedisChoosableSet<V>> getCurrentRef(K k) {
+		AtomicReference<RedisChoosableSet<V>> currentRef = choosableSetPtr.get(k);
+		if (currentRef == null) {
+			currentRef = new AtomicReference<>();
+			AtomicReference<RedisChoosableSet<V>> previous = choosableSetPtr.putIfAbsent(k, currentRef);
 			if (previous != null) {
-				current = previous;
+				currentRef = previous;
 			}
 		}
-		return current;
+		return currentRef;
+	}
+
+	// static class CurrentChoosableSet<V> {
+	// final RedisChoosableSet<V> ref;
+	// final V value;
+	//
+	// public CurrentChoosableSet(RedisChoosableSet<V> ref, V value) {
+	// Objects.requireNonNull(ref, "ref");
+	// Objects.requireNonNull(value, "value");
+	// this.ref = ref;
+	// this.value = value;
+	// }
+	//
+	// @Override
+	// public String toString() {
+	// return super.toString() + "{value=" + value + ", ref=" + ref + "}";
+	// }
+	// }
+
+	@Override
+	public String toString() {
+		return super.toString() + "{name=" + name + "}";
 	}
 
 }

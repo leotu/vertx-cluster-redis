@@ -94,13 +94,13 @@ public class FactoryImpl implements Factory {
 			 */
 			@Override
 			public boolean remove(Object serverID, Object connHolder) {
-				boolean ok = super.remove(serverID, connHolder);
-				if (ok) {
+				boolean wasRemoved = super.remove(serverID, connHolder);
+				if (wasRemoved) {
 					pendingProcessorRef.get().run((ServerID) serverID, connHolder);
 				} else {
-					log.debug("skip pendingProcessor serverID: {}, remove nothing.", serverID);
+					log.debug("skip pendingProcessor serverID: {}, was removed nothing.", serverID);
 				}
-				return ok;
+				return wasRemoved;
 			}
 		};
 

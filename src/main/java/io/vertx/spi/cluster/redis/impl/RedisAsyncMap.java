@@ -311,4 +311,8 @@ class RedisAsyncMap<K, V> implements AsyncMap<K, V>, ExpirableAsync<K> {
 		});
 	}
 
+	@Override
+	public String toString() {
+		return super.toString() + "{name=" + name + "}";
+	}
 }

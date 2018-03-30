@@ -194,6 +194,7 @@ public class RedisClusterManager implements ClusterManager {
 
 	private void clearLocalCached() {
 		if (subs != null && subs instanceof LocalCached) {
+			// log.debug("Discard local cached subs: {}", subs);
 			((LocalCached) subs).discard();
 		}
 	}

@@ -103,7 +103,6 @@ class RedisAsyncMultiMapSubs extends RedisAsyncMultiMap<String, ClusterNodeInfo>
 	private void batchRemoveAllMatching(Predicate<ClusterNodeInfo> p, Handler<AsyncResult<Void>> completionHandler) {
 		List<Map.Entry<String, ClusterNodeInfo>> deletedList = new ArrayList<>();
 		mmap.entries().forEach(entry -> {
-			// String key = entry.getKey();
 			ClusterNodeInfo value = entry.getValue();
 			if (p.test(value)) { // XXX: "!members.contains(ci.nodeId)"
 				deletedList.add(entry);
