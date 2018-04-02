@@ -51,7 +51,8 @@ class RedisMapHaInfo extends RedisMap<String, String> implements NodeAttachListe
 		super(vertx, redisson, name);
 		this.clusterManager = clusterManager;
 		this.timeToLiveSeconds = timeToLiveSeconds;
-		this.ttlMonitor = new RedisMapHaInfoTTLMonitor(vertx, this.clusterManager, redisson, this, refreshIntervalSeconds);
+		this.ttlMonitor = new RedisMapHaInfoTTLMonitor(vertx, this.clusterManager, redisson, this, this.name,
+				refreshIntervalSeconds);
 	}
 
 	/**

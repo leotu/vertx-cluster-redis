@@ -33,12 +33,14 @@ class RedisMap<K, V> implements Map<K, V> {
 
 	protected final Vertx vertx;
 	protected final RMap<K, V> map;
+	protected final String name;
 
 	public RedisMap(Vertx vertx, RedissonClient redisson, String name) {
 		Objects.requireNonNull(redisson, "redisson");
 		Objects.requireNonNull(name, "name");
 		this.vertx = vertx;
-		this.map = createMap(redisson, name);
+		this.name = name;
+		this.map = createMap(redisson, this.name);
 	}
 
 	/**
@@ -111,5 +113,10 @@ class RedisMap<K, V> implements Map<K, V> {
 	public Set<Entry<K, V>> entrySet() {
 		// "map.entrySet()" <b>DOESN'T</b> fetch all of them as {@link #readAllEntrySet()} does.
 		return map.readAllEntrySet();
+	}
+
+	@Override
+	public String toString() {
+		return super.toString() + "{name=" + name + "}";
 	}
 }

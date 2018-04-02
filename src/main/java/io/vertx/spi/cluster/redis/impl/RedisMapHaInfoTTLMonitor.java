@@ -67,15 +67,16 @@ class RedisMapHaInfoTTLMonitor implements NodeAttachListener {
 	private EntryCreatedListener<String, String> nodeCreatedNofity; // join?
 
 	private boolean syncSubs = false;
-	// private final AtomicReference<Date> faultTimeMaker = new AtomicReference<>();
+	protected final String name;
 
 	public RedisMapHaInfoTTLMonitor(Vertx vertx, ClusterManager clusterManager, RedissonClient redisson,
-			RedisMapHaInfo redisMapHaInfo, int refreshIntervalSeconds) {
+			RedisMapHaInfo redisMapHaInfo, String name, int refreshIntervalSeconds) {
 		Objects.requireNonNull(redisson, "redisson");
 		Objects.requireNonNull(redisMapHaInfo, "redisMapHaInfo");
 		this.vertx = vertx;
 		this.clusterManager = clusterManager;
 		this.redisMapHaInfo = redisMapHaInfo;
+		this.name = name;
 		this.refreshIntervalSeconds = refreshIntervalSeconds;
 		this.mapAsync = redisMapHaInfo.getMapAsync();
 	}
@@ -201,84 +202,22 @@ class RedisMapHaInfoTTLMonitor implements NodeAttachListener {
 						}
 					} else {
 						log.warn("nodeId: {}, error: {}", nodeId, e.toString());
-						// faultTimeMaker.compareAndSet(null, new Date());
 					}
 				});
 	}
 
-	/**
-	 * Stable
-	 * <p/>
-	 * get --> put
-	 */
-	@Deprecated
-	@SuppressWarnings("unused")
-	private void refreshAction_(String nodeId) {
-		mapAsync.getAsync(nodeId).whenComplete((v, e) -> {
-			if (e != null) {
-				log.warn("nodeId: {}, error: {}", nodeId, e.toString());
-				// faultTimeMaker.compareAndSet(null, new Date());
-			} else {
-				if (v == null) {
-					log.info("(v == null), nodeId: {}", nodeId);
-					// checkRejoin(faultTimeMaker.getAndSet(null), v);
-					checkRejoin(v);
-				} else {
-					mapAsync.fastPutAsync(nodeId, v, redisMapHaInfo.getTimeToLiveSeconds(), TimeUnit.SECONDS)
-							.whenComplete((newOne, e2) -> {
-								if (e2 == null) {
-									if (newOne) {
-										log.warn("newOne(addHaInfoIfLost): {}, nodeId: {}, value: {}, previous value: {}", newOne, nodeId,
-												v);
-									}
-								} else {
-									log.warn("nodeId: {}, error: {}", nodeId, e2.toString());
-									// faultTimeMaker.compareAndSet(null, new Date());
-								}
-							});
-
-					// =======================
-					// mapAsync.putAsync(nodeId, v, redisMapHaInfo.getTimeToLiveSeconds(), TimeUnit.SECONDS)
-					// .whenComplete((previous, e2) -> {
-					// if (e2 == null) {
-					// if (!v.equals(previous)) {
-					// log.warn("(!v.equals(previous)), nodeId={}, v={}, previous={}",
-					// nodeId, v, previous);
-					// }
-					// } else {
-					// faultTimeMaker.compareAndSet(null, new Date());
-					// }
-					// });
-				}
-			}
-		});
-	}
-
-	/**
-	 * NonPublicSupportAPI.addHaInfoIfLost(...) will fire EntryCreatedListener(...)
-	 */
-	// private void checkRejoin(Date faultTime, String haInfo) {
-	private void checkRejoin(String haInfo) {
-		String nodeId = clusterManager.getNodeID();
-		if (!clusterManager.isActive()) {
-			return;
-		}
-		if (haInfo == null) { // rejoin
-			NonPublicAPI.addHaInfoIfLost(ClusteredEventBusAPI.haManager(ClusteredEventBusAPI.eventBus(vertx)), nodeId); // XXX
-		}
-
-		// if (faultTime != null && haInfo != null) {
-		// int timeToLiveSeconds = redisMapHaInfo.getTimeToLiveSeconds();
-		// LocalDateTime now = LocalDateTime.now();
-		// LocalDateTime faultTimeWithTTL = faultTime.toInstant().plusSeconds(timeToLiveSeconds)
-		// .atZone(ZoneId.systemDefault()).toLocalDateTime();
-		//
-		// if (now.isAfter(faultTimeWithTTL)) {
-		// log.debug("nodeId: {}, now: {}, faultTimeWithTTL: {}, now.isAfter(faultTimeWithTTL): {}", nodeId, now,
-		// faultTimeWithTTL, now.isAfter(faultTimeWithTTL));
-		// }
-		// }
-	}
+	// /**
+	// * NonPublicSupportAPI.addHaInfoIfLost(...) will fire EntryCreatedListener(...)
+	// */
+	// private void checkRejoin(String haInfo) {
+	// String nodeId = clusterManager.getNodeID();
+	// if (!clusterManager.isActive()) {
+	// return;
+	// }
+	// if (haInfo == null) { // rejoin
+	// NonPublicAPI.addHaInfoIfLost(ClusteredEventBusAPI.haManager(ClusteredEventBusAPI.eventBus(vertx)), nodeId); // XXX
+	// }
+	// }
 
 	private void detachListener() {
 		if (removedListeneId != 0) {
@@ -309,5 +248,10 @@ class RedisMapHaInfoTTLMonitor implements NodeAttachListener {
 	protected void stop() {
 		detachListener();
 		stopScheduler();
+	}
+
+	@Override
+	public String toString() {
+		return super.toString() + "{name=" + name + "}";
 	}
 }

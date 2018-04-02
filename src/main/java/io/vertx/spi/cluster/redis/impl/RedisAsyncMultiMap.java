@@ -64,7 +64,7 @@ class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 		this.vertx = vertx;
 		this.redisson = redisson;
 		this.name = name;
-		this.mmap = createMultimap(this.redisson, name);
+		this.mmap = createMultimap(this.redisson, this.name);
 	}
 
 	/**
