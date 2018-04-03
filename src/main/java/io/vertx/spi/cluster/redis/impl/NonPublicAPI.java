@@ -139,7 +139,7 @@ class NonPublicAPI {
 		 * @see ClusteredEventBus#sendRemote
 		 */
 		public static void sendRemote(ClusteredEventBus eventBus, ServerID serverID, ClusteredMessage<?, ?> message) {
-			Reflection.callMethod(eventBus, ClusteredEventBus.class, "sendRemote",
+			Reflection.invokeMethod(eventBus, ClusteredEventBus.class, "sendRemote",
 					new Class[] { ServerID.class, MessageImpl.class }, new Object[] { serverID, message });
 		}
 
@@ -153,7 +153,7 @@ class NonPublicAPI {
 		 * @see ClusteredEventBus#connections
 		 */
 		public static ConcurrentMap<ServerID, ?> connections(ClusteredEventBus eventBus) {
-			return Reflection.callMethod(eventBus, ClusteredEventBus.class, "connections");
+			return Reflection.invokeMethod(eventBus, ClusteredEventBus.class, "connections");
 		}
 
 		public static void setConnections(ClusteredEventBus eventBus, ConcurrentMap<ServerID, ?> connections) {
@@ -256,16 +256,16 @@ class NonPublicAPI {
 		 *
 		 * @param reflectObj null for static method
 		 */
-		public static <T> T callMethod(Object reflectObj, Class<?> clsObj, String methodName) {
-			return callMethod(reflectObj, clsObj, methodName, new Class<?>[0], new Object[0]);
+		public static <T> T invokeMethod(Object reflectObj, Class<?> clsObj, String methodName) {
+			return invokeMethod(reflectObj, clsObj, methodName, new Class<?>[0], new Object[0]);
 		}
 
 		/**
 		 *
 		 * @param reflectObj null for static method
 		 */
-		@SuppressWarnings({ "unchecked", "unused" })
-		public static <T> T callMethod(Object reflectObj, Class<?> clsObj, String methodName, Class<?>[] argsTypes,
+		@SuppressWarnings({ "unchecked" })
+		public static <T> T invokeMethod(Object reflectObj, Class<?> clsObj, String methodName, Class<?>[] argsTypes,
 				Object[] argsValues) {
 			Objects.requireNonNull(clsObj, "clsObj");
 			Objects.requireNonNull(methodName, "methodName");
@@ -289,7 +289,7 @@ class NonPublicAPI {
 		/**
 		 * @param reflectObj may be null.
 		 */
-		static public <T> T callMethod(Object reflectObj, Method method, Object[] argsValues) {
+		static public <T> T invokeMethod(Object reflectObj, Method method, Object[] argsValues) {
 			if (method == null) {
 				throw new IllegalArgumentException("(method == null)");
 			}

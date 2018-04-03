@@ -34,6 +34,7 @@ import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
 import io.vertx.core.eventbus.impl.clustered.ClusterNodeInfo;
+import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.shareddata.AsyncMap;
@@ -62,21 +63,12 @@ public class RedisClusterManager implements ClusterManager {
 
 	private Vertx vertx;
 	private final RedissonClient redisson;
-
-	private String nodeId;
+	private final Options options;
 
 	private AtomicBoolean active = new AtomicBoolean();
-	private boolean disableTTL = false; // XXX
 	private NodeListener nodeListener;
-
 	private Map<String, String> haInfo;
-	private final int haInfoTimeToLiveSeconds = disableTTL ? 0 : 10; // TTL seconds
-	private final int haInfoRefreshIntervalSeconds = 5; // TTL Refresh seconds
-
 	private AsyncMultiMap<String, ClusterNodeInfo> subs;
-	private boolean enableCacheSubs = false; // XXX
-	private String cacheSubsTopicName = "cacheSubsTopic";
-	private final int cacheSubsTimeoutInSecoinds = 15;
 
 	private ConcurrentMap<String, Map<?, ?>> mapCache = new ConcurrentHashMap<>();
 	private ConcurrentMap<String, AsyncMap<?, ?>> asyncMapCache = new ConcurrentHashMap<>();
@@ -86,7 +78,15 @@ public class RedisClusterManager implements ClusterManager {
 		Objects.requireNonNull(redisson, "redisson");
 		Objects.requireNonNull(nodeId, "nodeId");
 		this.redisson = redisson;
-		this.nodeId = nodeId;
+		this.options = new Options();
+		this.options.nodeId = nodeId;
+	}
+
+	public RedisClusterManager(RedissonClient redisson, Options options) {
+		Objects.requireNonNull(redisson, "redisson");
+		Objects.requireNonNull(options, "options");
+		this.redisson = redisson;
+		this.options = options;
 	}
 
 	/**
@@ -107,9 +107,9 @@ public class RedisClusterManager implements ClusterManager {
 			if (name.equals(SUBS_MAP_NAME)) {
 				if (subs == null) {
 					subs = factory.createAsyncMultiMapSubs(vertx, this, redisson, name);
-					if (enableCacheSubs) {
-						subs = factory.createLocalCachedAsyncMultiMap(vertx, this, redisson, subs, cacheSubsTimeoutInSecoinds,
-								cacheSubsTopicName);
+					if (options.enableCacheSubs) {
+						subs = factory.createLocalCachedAsyncMultiMap(vertx, this, redisson, subs,
+								options.cacheSubsTimeoutInSecoinds, options.cacheSubsTopicName);
 					}
 					factory.createPendingMessageProcessor(vertx, this, subs); // XXX: EventBus ready been created
 				}
@@ -146,8 +146,8 @@ public class RedisClusterManager implements ClusterManager {
 	public <K, V> Map<K, V> getSyncMap(String name) {
 		if (name.equals(CLUSTER_MAP_NAME)) {
 			if (haInfo == null) {
-				haInfo = factory.createMapHaInfo(vertx, this, redisson, name, haInfoTimeToLiveSeconds,
-						haInfoRefreshIntervalSeconds);
+				haInfo = factory.createMapHaInfo(vertx, this, redisson, name, options.haInfoTimeToLiveSeconds,
+						options.haInfoRefreshIntervalSeconds);
 			}
 			return (Map<K, V>) haInfo;
 		} else {
@@ -163,7 +163,7 @@ public class RedisClusterManager implements ClusterManager {
 			lock.tryLockAsync(timeout, TimeUnit.MILLISECONDS).whenComplete((v, e) -> resultHandler
 					.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(new RedisLock(lock))));
 		} catch (Exception e) {
-			log.info("nodeId: " + nodeId + ", name: " + name + ", timeout: " + timeout, e);
+			log.info("nodeId: " + options.nodeId + ", name: " + name + ", timeout: " + timeout, e);
 			resultHandler.handle(Future.failedFuture(e));
 		}
 	}
@@ -174,14 +174,14 @@ public class RedisClusterManager implements ClusterManager {
 			RAtomicLong counter = redisson.getAtomicLong(name);
 			resultHandler.handle(Future.succeededFuture(new RedisCounter(counter)));
 		} catch (Exception e) {
-			log.info("nodeId: " + nodeId + ", name: " + name, e);
+			log.info("nodeId: " + options.nodeId + ", name: " + name, e);
 			resultHandler.handle(Future.failedFuture(e));
 		}
 	}
 
 	@Override
 	public String getNodeID() {
-		return nodeId;
+		return options.nodeId;
 	}
 
 	/**
@@ -264,7 +264,7 @@ public class RedisClusterManager implements ClusterManager {
 			}, resultHandler);
 		} else {
 			// throw new IllegalStateException("Already activated");
-			log.warn("Already activated, nodeId: {}", nodeId);
+			log.warn("Already activated, nodeId: {}", options.nodeId);
 			vertx.getOrCreateContext().runOnContext(v -> Future.<Void>succeededFuture().setHandler(resultHandler));
 		}
 	}
@@ -283,7 +283,7 @@ public class RedisClusterManager implements ClusterManager {
 			}, resultHandler);
 		} else {
 			// throw new IllegalStateException("Already inactive");
-			log.warn("Already activated, nodeId: {}", nodeId);
+			log.warn("Already activated, nodeId: {}", options.nodeId);
 			vertx.getOrCreateContext().runOnContext(v -> Future.<Void>succeededFuture().setHandler(resultHandler));
 		}
 	}
@@ -376,4 +376,81 @@ public class RedisClusterManager implements ClusterManager {
 		}
 	}
 
+	/**
+	 * Redis ClusterManager Options
+	 */
+	static public class Options {
+		private String nodeId;
+		private boolean disableTTL = false; // XXX
+		private int haInfoTimeToLiveSeconds = disableTTL ? 0 : 10; // TTL seconds
+		private int haInfoRefreshIntervalSeconds = 5; // TTL Refresh seconds
+		private boolean enableCacheSubs = false; // XXX
+		private String cacheSubsTopicName = "cacheSubsTopic";
+		private int cacheSubsTimeoutInSecoinds = 15;
+
+		public Options() {
+		}
+
+		public Options(JsonObject json) {
+			fromJson(json);
+		}
+
+		public JsonObject toJson() {
+			return new JsonObject().put("nodeId", nodeId) //
+					.put("disableTTL", disableTTL).put("haInfoTimeToLiveSeconds", haInfoTimeToLiveSeconds)
+					.put("haInfoRefreshIntervalSeconds", haInfoRefreshIntervalSeconds) //
+					.put("enableCacheSubs", enableCacheSubs).put("cacheSubsTopicName", cacheSubsTopicName)
+					.put("cacheSubsTimeoutInSecoinds", cacheSubsTimeoutInSecoinds);
+		}
+
+		public void fromJson(JsonObject json) {
+			if (json.containsKey("nodeId")) {
+				this.nodeId = json.getString("nodeId");
+				Objects.requireNonNull(nodeId, "nodeId");
+			}
+			if (json.containsKey("disableTTL")) {
+				this.disableTTL = json.getBoolean("disableTTL");
+				if (disableTTL) {
+					log.info("disableTTL: {}", disableTTL);
+				}
+			}
+
+			if (json.containsKey("haInfoTimeToLiveSeconds")) {
+				this.haInfoTimeToLiveSeconds = json.getInteger("haInfoTimeToLiveSeconds");
+			}
+			if (disableTTL) {
+				haInfoTimeToLiveSeconds = 0;
+			}
+
+			if (json.containsKey("haInfoRefreshIntervalSeconds")) {
+				this.haInfoRefreshIntervalSeconds = json.getInteger("haInfoRefreshIntervalSeconds");
+			}
+			if (haInfoRefreshIntervalSeconds < 3) {
+				haInfoRefreshIntervalSeconds = 3;
+			}
+
+			if (json.containsKey("enableCacheSubs")) {
+				this.enableCacheSubs = json.getBoolean("enableCacheSubs");
+			}
+			if (enableCacheSubs) {
+				log.info("enableCacheSubs: {}", enableCacheSubs);
+			}
+
+			if (json.containsKey("cacheSubsTopicName")) {
+				this.cacheSubsTopicName = json.getString("cacheSubsTopicName");
+				Objects.requireNonNull(cacheSubsTopicName, "cacheSubsTopicName");
+			}
+
+			//
+			if (json.containsKey("cacheSubsTimeoutInSecoinds")) {
+				this.cacheSubsTimeoutInSecoinds = json.getInteger("cacheSubsTimeoutInSecoinds");
+			}
+			if (cacheSubsTimeoutInSecoinds < 5) {
+				cacheSubsTimeoutInSecoinds = 5;
+			}
+
+			//
+			log.debug("options: {}", toJson().encodePrettily());
+		}
+	}
 }

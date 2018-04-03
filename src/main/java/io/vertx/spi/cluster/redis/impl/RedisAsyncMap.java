@@ -214,10 +214,10 @@ class RedisAsyncMap<K, V> implements AsyncMap<K, V>, ExpirableAsync<K> {
 	@Override
 	public void refreshIfPresent(K k, long timeToLive, TimeUnit timeUnit, Handler<AsyncResult<Long>> resultHandler) {
 		Context context = vertx.getOrCreateContext();
-		final String key = Reflection.callMethod(map, RedissonMapCache.class, "getTimeoutSetNameByKey",
+		final String key = Reflection.invokeMethod(map, RedissonMapCache.class, "getTimeoutSetNameByKey",
 				new Class<?>[] { Object.class }, new Object[] { name });
 
-		final ByteBuf encodeMapKey = Reflection.callMethod(map, RedissonObject.class, "encodeMapKey",
+		final ByteBuf encodeMapKey = Reflection.invokeMethod(map, RedissonObject.class, "encodeMapKey",
 				new Class<?>[] { Object.class }, new Object[] { k });
 		final String field = encodeMapKey.toString(CharsetUtil.UTF_8);
 
@@ -264,11 +264,11 @@ class RedisAsyncMap<K, V> implements AsyncMap<K, V>, ExpirableAsync<K> {
 
 	private void getTTL2(K k, Handler<AsyncResult<Long>> resultHandler) {
 		// final String key = "redisson__timeout__set:{" + name + "}"; // XXX
-		final String key = Reflection.callMethod(map, RedissonMapCache.class, "getTimeoutSetNameByKey",
+		final String key = Reflection.invokeMethod(map, RedissonMapCache.class, "getTimeoutSetNameByKey",
 				new Class<?>[] { Object.class }, new Object[] { name });
 
 		// final String field = "\"" + k + "\""; // XXX
-		final ByteBuf encodeMapKey = Reflection.callMethod(map, RedissonObject.class, "encodeMapKey",
+		final ByteBuf encodeMapKey = Reflection.invokeMethod(map, RedissonObject.class, "encodeMapKey",
 				new Class<?>[] { Object.class }, new Object[] { k });
 		final String field = encodeMapKey.toString(CharsetUtil.UTF_8);
 
