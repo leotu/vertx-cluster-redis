@@ -17,7 +17,6 @@ package io.vertx.spi.cluster.redis.impl;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Queue;
@@ -28,9 +27,7 @@ import io.vertx.core.CompositeFuture;
 import io.vertx.core.Context;
 import io.vertx.core.Future;
 import io.vertx.core.Handler;
-import io.vertx.core.MultiMap;
 import io.vertx.core.Vertx;
-import io.vertx.core.eventbus.Message;
 import io.vertx.core.eventbus.impl.clustered.ClusterNodeInfo;
 import io.vertx.core.eventbus.impl.clustered.ClusteredEventBus;
 import io.vertx.core.eventbus.impl.clustered.ClusteredMessage;
@@ -53,13 +50,11 @@ import io.vertx.spi.cluster.redis.impl.NonPublicAPI.ClusteredEventBusAPI.Connect
 class PendingMessageProcessorImpl implements PendingMessageProcessor {
 	private static final Logger log = LoggerFactory.getLogger(PendingMessageProcessorImpl.class);
 
-	final static private String HA_RETRY_SERVER_ID_KEY = "__HA_RETRY_SERVER_ID";
-	final static private String HA_RETRY_DISCARD_MESSAGE_KEY = "__HA_RETRY_DISCARD_MESSAGE";
-
 	private static boolean debug = false;
 
 	private final Vertx vertx;
 	private final ClusteredEventBus eventBus;
+
 	@SuppressWarnings("unused")
 	private final Context sendNoContext;
 	private ServerID selfServerID; // self, local server
@@ -67,6 +62,7 @@ class PendingMessageProcessorImpl implements PendingMessageProcessor {
 	private final AsyncMultiMap<String, ClusterNodeInfo> subs;
 	private final ClusterManager clusterManager;
 	private final ConcurrentMap<ServerID, Object> connections; // <ServerID, ConnectionHolder>
+	private PendingRetryingStrategy strategy;
 
 	public PendingMessageProcessorImpl(Vertx vertx, ClusterManager clusterManager, ClusteredEventBus eventBus,
 			AsyncMultiMap<String, ClusterNodeInfo> subs, ConcurrentMap<ServerID, Object> connections) {
@@ -76,13 +72,20 @@ class PendingMessageProcessorImpl implements PendingMessageProcessor {
 		this.subs = subs;
 		this.sendNoContext = vertx.getOrCreateContext();
 		this.connections = connections;
+		this.strategy = new PendingRetryingStrategy(this.connections);
+	}
+
+	private void initIfNeeded() {
+		if (this.selfServerID == null) {
+			this.selfServerID = ClusteredEventBusAPI.serverID(this.eventBus);
+			this.strategy.setSelfServerID(this.selfServerID);
+		}
 	}
 
 	@Override
 	public void run(Object failedServerID, Object connHolder) {
-		if (this.selfServerID == null) {
-			this.selfServerID = ClusteredEventBusAPI.serverID(this.eventBus);
-		}
+		initIfNeeded();
+
 		Objects.requireNonNull(failedServerID, "failedServerID");
 		Objects.requireNonNull(connHolder, "connHolder");
 
@@ -215,11 +218,7 @@ class PendingMessageProcessorImpl implements PendingMessageProcessor {
 			}
 			return true;
 		}
-		// if (retryTimes(message) == 0) {
-		// return false;
-		// } else {
-		return isDiscardMessage(message);
-		// }
+		return strategy.isDiscardMessage(message);
 	}
 
 	private Future<Boolean> resend(ServerID failedServerID, ClusteredMessage<?, ?> message) {
@@ -266,146 +265,17 @@ class PendingMessageProcessorImpl implements PendingMessageProcessor {
 	private Future<Void> resendToSubs(ServerID failedServerID, ClusteredMessage<?, ?> message,
 			ChoosableIterable<ClusterNodeInfo> subs) {
 		Future<Void> fu = Future.future();
-
 		vertx.executeBlocking(future -> {
-			ClusterNodeInfo ci;
-			ServerID choosedServerID = null;
-			ServerID pendingServerID = null;
-			ServerID localServerID = null;
-
-			boolean repeatFailedServer = false;
-			int repeatRetryServers = 0;
-			boolean repeatLocalServer = false;
-			boolean pendingServerServer = false;
-			while ((ci = subs.choose()) != null) { // Choose one
-				ServerID next = ci.serverID;
-				if (next.equals(failedServerID)) {
-					if (debug) {
-						log.debug("^^^ (next.equals(failedServerID)), next: {}", next);
-					}
-					if (repeatFailedServer) {
-						break;
-					}
-					repeatFailedServer = true;
-				} else if (next.equals(selfServerID)) {
-					localServerID = next;
-					if (debug) {
-						log.debug("^^^ (next.equals(selfServerID)), next: {}", next);
-					}
-					if (repeatLocalServer) {
-						break;
-					}
-					repeatLocalServer = true;
-				} else if (inRetryServerList(message, next)) {
-					if (debug) {
-						log.debug("^^^ (inRetryServerList(message, next)), next: {}, retryServers: {}, repeatRetryServers:{}", next,
-								getRetryServerList(message), repeatRetryServers);
-					}
-					if (repeatRetryServers > getRetryServerList(message).size()) {
-						break;
-					}
-					repeatRetryServers++;
-					continue;
-				} else {
-					Object connHolder = connections.get(next);
-					if (connHolder == null) { // new open
-						choosedServerID = next;
-						break;
-					} else { // exist
-						Queue<ClusteredMessage<?, ?>> pending = ConnectionHolderAPI.pending(connHolder);
-						if (pending == null || pending.isEmpty()) { // not pending node
-							choosedServerID = next;
-							break;
-						} else {
-							pendingServerID = next; // next is pending node
-							if (debug) {
-								log.debug("^^^ pendingServerID = next, next: {}", next);
-							}
-							if (pendingServerServer) {
-								break;
-							}
-							pendingServerServer = true;
-						}
-					}
-				}
-			}
-
-			int currentRetryTimes = retryTimes(message);
-			if (choosedServerID == null) { // not found available server ID
-				if (localServerID != null) {
-					choosedServerID = localServerID;
-					if (debug) {
-						log.debug(
-								"*** new one not found, switch to local server: {}, current retry times: {}, address: '{}', body: {}",
-								choosedServerID, currentRetryTimes, message.address(), message.body());
-					}
-				} else if (pendingServerID != null) {
-					choosedServerID = pendingServerID;
-					if (debug) {
-						log.debug(
-								"*** new one not found, switch to pending server: {}, current retry times: {}, address: '{}', body: {}",
-								choosedServerID, currentRetryTimes, message.address(), message.body());
-					}
-				} else {
-					choosedServerID = failedServerID;
-					if (debug) {
-						log.debug(
-								"*** new one not found, switch to failed server: {}, current retry times: {}, address: '{}', body: {}",
-								choosedServerID, currentRetryTimes, message.address(), message.body());
-					}
-				}
+			Future<ServerID> selectOneFuture = strategy.next(failedServerID, message, subs);
+			if (selectOneFuture.failed()) {
+				future.fail(selectOneFuture.cause());
 			} else {
-				if (debug) {
-					log.debug(
-							"*** new one found, switch to new server: {} and failed server: {}, current retry times: {}, address: '{}', body: {}",
-							choosedServerID, failedServerID, currentRetryTimes, message.address(), message.body());
-				}
-			}
-
-			if (!inRetryServerList(message, choosedServerID)) {
-				appendRetryServer(message, choosedServerID);
+				ServerID choosedServerID = selectOneFuture.result();
 				ClusteredEventBusAPI.sendRemote(eventBus, choosedServerID, message);
 				future.complete();
-			} else {
-				markDiscardMessage(message, choosedServerID);
-				future.fail("No one can be choose, retry servers: " + getRetryServerList(message));
 			}
 		}, false, fu); // executed in parallel
 		return fu;
-
 	}
 
-	// =====
-	private boolean isDiscardMessage(Message<?> message) {
-		return message.headers().contains(HA_RETRY_DISCARD_MESSAGE_KEY);
-	}
-
-	private void markDiscardMessage(Message<?> message, ServerID choosedServerID) {
-		message.headers().set(HA_RETRY_DISCARD_MESSAGE_KEY, choosedServerID.toString());
-	}
-
-	private void appendRetryServer(Message<?> message, ServerID choosedServerID) {
-		MultiMap headers = message.headers();
-		if (retryTimes(message) == 0) {
-			headers.set(HA_RETRY_SERVER_ID_KEY, choosedServerID.toString());
-		} else {
-			headers.set(HA_RETRY_SERVER_ID_KEY, headers.get(HA_RETRY_SERVER_ID_KEY) + "," + choosedServerID.toString());
-		}
-		if (debug) {
-			log.debug("appendRetryServer: {}", headers.get(HA_RETRY_SERVER_ID_KEY));
-		}
-	}
-
-	private int retryTimes(Message<?> message) {
-		return getRetryServerList(message).size();
-	}
-
-	private List<String> getRetryServerList(Message<?> message) {
-		String serverList = message.headers().get(HA_RETRY_SERVER_ID_KEY);
-		return Arrays.asList(serverList == null ? new String[0] : serverList.split(","));
-	}
-
-	private boolean inRetryServerList(Message<?> message, ServerID serverID) {
-		return getRetryServerList(message).contains(serverID.toString());
-	}
 }
