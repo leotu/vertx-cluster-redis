@@ -59,6 +59,25 @@ class RedisChoosableSet<T> implements ChoosableIterable<T>, Serializable {
 		}
 	}
 
+	public boolean isNewSet() {
+		RedisChoosableSet<T> current = currentRef.get();
+		if (current != null) {
+			synchronized (current) {
+				if (current.equals(this)) {
+					if (debug) {
+						log.debug("(current.equals(this)), current: {}", current);
+					}
+					return false;
+				}
+			}
+		}
+		if (debug) {
+			log.debug("Not equals, current.size: {}, current: {}; this.size:{}, this: {}",
+					current == null ? "<null>" : current.size(), current, this.size(), this);
+		}
+		return true;
+	}
+
 	public int size() {
 		return ids.size();
 	}

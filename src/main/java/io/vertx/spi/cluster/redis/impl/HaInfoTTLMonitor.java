@@ -17,9 +17,9 @@ package io.vertx.spi.cluster.redis.impl;
 
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 
 import org.redisson.api.RMapCache;
 import org.redisson.api.RedissonClient;
@@ -48,12 +48,9 @@ import io.vertx.spi.cluster.redis.impl.NonPublicAPI.ClusteredEventBusAPI;
  * @see org.redisson.api.RedissonClient#getExecutorService
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
-class RedisMapHaInfoTTLMonitor implements NodeAttachListener {
-	private static final Logger log = LoggerFactory.getLogger(RedisMapHaInfoTTLMonitor.class);
+class HaInfoTTLMonitor implements NodeAttachListener {
+	private static final Logger log = LoggerFactory.getLogger(HaInfoTTLMonitor.class);
 
-	final private int refreshIntervalSeconds;
-
-	private final ConcurrentMap<String, Long> resetTTL = new ConcurrentHashMap<>();// <nodeId, Timer ID>
 	private final Vertx vertx;
 	private final ClusterManager clusterManager;
 	private final RedisMapHaInfo redisMapHaInfo;
@@ -68,8 +65,9 @@ class RedisMapHaInfoTTLMonitor implements NodeAttachListener {
 
 	private boolean syncSubs = false;
 	protected final String name;
+	private final TTLAgent ttlAgent;
 
-	public RedisMapHaInfoTTLMonitor(Vertx vertx, ClusterManager clusterManager, RedissonClient redisson,
+	public HaInfoTTLMonitor(Vertx vertx, ClusterManager clusterManager, RedissonClient redisson,
 			RedisMapHaInfo redisMapHaInfo, String name, int refreshIntervalSeconds) {
 		Objects.requireNonNull(redisson, "redisson");
 		Objects.requireNonNull(redisMapHaInfo, "redisMapHaInfo");
@@ -77,8 +75,39 @@ class RedisMapHaInfoTTLMonitor implements NodeAttachListener {
 		this.clusterManager = clusterManager;
 		this.redisMapHaInfo = redisMapHaInfo;
 		this.name = name;
-		this.refreshIntervalSeconds = refreshIntervalSeconds;
 		this.mapAsync = redisMapHaInfo.getMapAsync();
+		this.ttlAgent = new TTLAgent(this.vertx, refreshIntervalSeconds);
+		this.ttlAgent.setAction(this::refreshAction);
+	}
+
+	/**
+	 * Faster
+	 * <p/>
+	 * newOne will fire EntryCreatedListener(...)
+	 */
+	private void refreshAction(long counter) {
+		String nodeId = clusterManager.getNodeID();
+		if (!clusterManager.isActive()) {
+			log.debug("(!clusterManager.isActive()), nodeId: {}, counter: {}", nodeId, counter);
+			return;
+		}
+		JsonObject haInfo = ClusteredEventBusAPI
+				.haInfo(ClusteredEventBusAPI.haManager(ClusteredEventBusAPI.eventBus(vertx)));
+		if (haInfo == null) {
+			log.warn("(haInfo == null), nodeId: {}, counter: {}", nodeId, counter);
+			return;
+		}
+		String v = haInfo.encode();
+		mapAsync.fastPutAsync(nodeId, v, redisMapHaInfo.getTimeToLiveSeconds(), TimeUnit.SECONDS)
+				.whenComplete((newOne, err) -> {
+					if (err == null) {
+						if (newOne) {
+							log.debug("newOne(addHaInfoIfLost): {}, nodeId: {}, counter: {}, value: {}", newOne, counter, nodeId, v);
+						}
+					} else {
+						log.warn("nodeId: {}, counter: {}, error: {}", nodeId, counter, err.toString());
+					}
+				});
 	}
 
 	/**
@@ -151,73 +180,9 @@ class RedisMapHaInfoTTLMonitor implements NodeAttachListener {
 				EntryEvent<String, String> event = new EntryEvent<>(mapAsync, Type.CREATED, nodeId, value, value);
 				nodeCreatedNofity.onCreated(event);
 			}
-			resetHaInfoTTL();
+			ttlAgent.start();
 		}
 	}
-
-	protected void resetHaInfoTTL() {
-		if (redisMapHaInfo.getTimeToLiveSeconds() <= 0) {
-			return;
-		}
-		String nodeId = clusterManager.getNodeID();
-		resetTTL.computeIfAbsent(nodeId, key -> {
-			int nodeTTL = redisMapHaInfo.getTimeToLiveSeconds();
-			// int refreshDelay = 30 * 1000; // debugging lost node
-			int refreshDelay = (nodeTTL / 3.0) < refreshIntervalSeconds ? (nodeTTL * 1000) / 3
-					: refreshIntervalSeconds * 1000; // milliseconds
-			if (refreshDelay < 2000) {
-				refreshDelay = 2000;
-			}
-			long timeId = vertx.setPeriodic(refreshDelay, id -> {
-				if (!clusterManager.isActive()) {
-					vertx.cancelTimer(id);
-					resetTTL.remove(nodeId, id);
-					// faultTimeMaker.set(null);
-				} else {
-					refreshAction(nodeId);
-				}
-			});
-			return timeId;
-		});
-	}
-
-	/**
-	 * Faster
-	 * <p/>
-	 * newOne will fire EntryCreatedListener(...)
-	 */
-	private void refreshAction(String nodeId) {
-		JsonObject haInfo = ClusteredEventBusAPI
-				.haInfo(ClusteredEventBusAPI.haManager(ClusteredEventBusAPI.eventBus(vertx)));
-		if (haInfo == null) {
-			log.warn("(haInfo == null)");
-			return;
-		}
-		String v = haInfo.encode();
-		mapAsync.fastPutAsync(nodeId, v, redisMapHaInfo.getTimeToLiveSeconds(), TimeUnit.SECONDS)
-				.whenComplete((newOne, e) -> {
-					if (e == null) {
-						if (newOne) {
-							log.debug("newOne(addHaInfoIfLost): {}, nodeId: {}, value: {}", newOne, nodeId, v);
-						}
-					} else {
-						log.warn("nodeId: {}, error: {}", nodeId, e.toString());
-					}
-				});
-	}
-
-	// /**
-	// * NonPublicSupportAPI.addHaInfoIfLost(...) will fire EntryCreatedListener(...)
-	// */
-	// private void checkRejoin(String haInfo) {
-	// String nodeId = clusterManager.getNodeID();
-	// if (!clusterManager.isActive()) {
-	// return;
-	// }
-	// if (haInfo == null) { // rejoin
-	// NonPublicAPI.addHaInfoIfLost(ClusteredEventBusAPI.haManager(ClusteredEventBusAPI.eventBus(vertx)), nodeId); // XXX
-	// }
-	// }
 
 	private void detachListener() {
 		if (removedListeneId != 0) {
@@ -238,20 +203,50 @@ class RedisMapHaInfoTTLMonitor implements NodeAttachListener {
 		}
 	}
 
-	private void stopScheduler() {
-		resetTTL.forEach((k, timeId) -> {
-			vertx.cancelTimer(timeId);
-		});
-		resetTTL.clear();
-	}
-
 	protected void stop() {
+		ttlAgent.stop();
 		detachListener();
-		stopScheduler();
 	}
 
 	@Override
 	public String toString() {
 		return super.toString() + "{name=" + name + "}";
 	}
+
+	private class TTLAgent {
+		private final Vertx vertx;
+		private final int freshIntervalInSeconds;
+		private Consumer<Long> action;
+		private long timeId = -1;
+		private AtomicLong counter = new AtomicLong(0);
+
+		public TTLAgent(Vertx vertx, int freshIntervalInSeconds) {
+			this.vertx = vertx;
+			this.freshIntervalInSeconds = freshIntervalInSeconds;
+		}
+
+		public void setAction(Consumer<Long> action) {
+			this.action = action;
+		}
+
+		public void start() {
+			if (timeId != -1) {
+				throw new IllegalStateException("(timeId != -1), timeId: " + timeId);
+			}
+			timeId = vertx.setPeriodic(TimeUnit.SECONDS.toMillis(freshIntervalInSeconds), id -> {
+				action.accept(counter.incrementAndGet());
+			});
+		}
+
+		public long stop() {
+			if (timeId == -1) {
+				throw new IllegalStateException("(timeId == -1)");
+			}
+			long id = timeId;
+			timeId = -1;
+			vertx.cancelTimer(id);
+			return counter.get();
+		}
+	}
+
 }

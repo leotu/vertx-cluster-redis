@@ -59,7 +59,7 @@ public class RedisClusterManager implements ClusterManager {
 	private static final String CLUSTER_MAP_NAME = FactoryImpl.CLUSTER_MAP_NAME;
 	private static final String SUBS_MAP_NAME = FactoryImpl.SUBS_MAP_NAME;
 
-	private static final Factory factory = new FactoryImpl();
+	private static final Factory factory = Factory.createDefaultFactory();
 
 	private Vertx vertx;
 	private final RedissonClient redisson;
@@ -75,16 +75,13 @@ public class RedisClusterManager implements ClusterManager {
 	private ConcurrentMap<String, AsyncMultiMap<?, ?>> asyncMultiMapCache = new ConcurrentHashMap<>();
 
 	public RedisClusterManager(RedissonClient redisson, String nodeId) {
-		Objects.requireNonNull(redisson, "redisson");
-		Objects.requireNonNull(nodeId, "nodeId");
-		this.redisson = redisson;
-		this.options = new Options();
-		this.options.nodeId = nodeId;
+		this(redisson, new Options().nodeId(nodeId));
 	}
 
 	public RedisClusterManager(RedissonClient redisson, Options options) {
 		Objects.requireNonNull(redisson, "redisson");
 		Objects.requireNonNull(options, "options");
+		Objects.requireNonNull(options.nodeId, "options.nodeId");
 		this.redisson = redisson;
 		this.options = options;
 	}
@@ -107,10 +104,10 @@ public class RedisClusterManager implements ClusterManager {
 			if (name.equals(SUBS_MAP_NAME)) {
 				if (subs == null) {
 					subs = factory.createAsyncMultiMapSubs(vertx, this, redisson, name);
-					if (options.enableCacheSubs) {
-						subs = factory.createLocalCachedAsyncMultiMap(vertx, this, redisson, subs,
-								options.cacheSubsTimeoutInSecoinds, options.cacheSubsTopicName);
-					}
+					// if (options.enableCacheSubs) {
+					// subs = factory.createLocalCachedAsyncMultiMap(vertx, this, redisson, subs,
+					// options.cacheSubsTimeoutInSecoinds, options.cacheSubsTopicName);
+					// }
 					factory.createPendingMessageProcessor(vertx, this, subs); // XXX: EventBus ready been created
 				}
 				future.complete((AsyncMultiMap<K, V>) subs);
@@ -293,6 +290,11 @@ public class RedisClusterManager implements ClusterManager {
 		return active.get();
 	}
 
+	@Override
+	public String toString() {
+		return super.toString() + "{nodeID=" + getNodeID() + "}";
+	}
+
 	/**
 	 * Lock implement
 	 */
@@ -384,9 +386,9 @@ public class RedisClusterManager implements ClusterManager {
 		private boolean disableTTL = false; // XXX
 		private int haInfoTimeToLiveSeconds = disableTTL ? 0 : 10; // TTL seconds
 		private int haInfoRefreshIntervalSeconds = 5; // TTL Refresh seconds
-		private boolean enableCacheSubs = false; // XXX
-		private String cacheSubsTopicName = "cacheSubsTopic";
-		private int cacheSubsTimeoutInSecoinds = 15;
+		// private boolean enableCacheSubs = false; // XXX
+		// private String cacheSubsTopicName = "cacheSubsTopic";
+		// private int cacheSubsTimeoutInSecoinds = 15;
 
 		public Options() {
 		}
@@ -395,15 +397,24 @@ public class RedisClusterManager implements ClusterManager {
 			fromJson(json);
 		}
 
+		public String nodeId() {
+			return nodeId;
+		}
+
+		public Options nodeId(String nodeId) {
+			this.nodeId = nodeId;
+			return this;
+		}
+
 		public JsonObject toJson() {
 			return new JsonObject().put("nodeId", nodeId) //
 					.put("disableTTL", disableTTL).put("haInfoTimeToLiveSeconds", haInfoTimeToLiveSeconds)
-					.put("haInfoRefreshIntervalSeconds", haInfoRefreshIntervalSeconds) //
-					.put("enableCacheSubs", enableCacheSubs).put("cacheSubsTopicName", cacheSubsTopicName)
-					.put("cacheSubsTimeoutInSecoinds", cacheSubsTimeoutInSecoinds);
+					.put("haInfoRefreshIntervalSeconds", haInfoRefreshIntervalSeconds); //
+			// .put("enableCacheSubs", enableCacheSubs).put("cacheSubsTopicName", cacheSubsTopicName)
+			// .put("cacheSubsTimeoutInSecoinds", cacheSubsTimeoutInSecoinds);
 		}
 
-		public void fromJson(JsonObject json) {
+		public Options fromJson(JsonObject json) {
 			if (json.containsKey("nodeId")) {
 				this.nodeId = json.getString("nodeId");
 				Objects.requireNonNull(nodeId, "nodeId");
@@ -429,28 +440,26 @@ public class RedisClusterManager implements ClusterManager {
 				haInfoRefreshIntervalSeconds = 3;
 			}
 
-			if (json.containsKey("enableCacheSubs")) {
-				this.enableCacheSubs = json.getBoolean("enableCacheSubs");
-			}
-			if (enableCacheSubs) {
-				log.info("enableCacheSubs: {}", enableCacheSubs);
-			}
-
-			if (json.containsKey("cacheSubsTopicName")) {
-				this.cacheSubsTopicName = json.getString("cacheSubsTopicName");
-				Objects.requireNonNull(cacheSubsTopicName, "cacheSubsTopicName");
-			}
-
 			//
-			if (json.containsKey("cacheSubsTimeoutInSecoinds")) {
-				this.cacheSubsTimeoutInSecoinds = json.getInteger("cacheSubsTimeoutInSecoinds");
-			}
-			if (cacheSubsTimeoutInSecoinds < 5) {
-				cacheSubsTimeoutInSecoinds = 5;
-			}
+			// if (json.containsKey("enableCacheSubs")) {
+			// this.enableCacheSubs = json.getBoolean("enableCacheSubs");
+			// }
+			// if (enableCacheSubs) {
+			// log.info("enableCacheSubs: {}", enableCacheSubs);
+			// }
+			// if (json.containsKey("cacheSubsTopicName")) {
+			// this.cacheSubsTopicName = json.getString("cacheSubsTopicName");
+			// Objects.requireNonNull(cacheSubsTopicName, "cacheSubsTopicName");
+			// }
+			// if (json.containsKey("cacheSubsTimeoutInSecoinds")) {
+			// this.cacheSubsTimeoutInSecoinds = json.getInteger("cacheSubsTimeoutInSecoinds");
+			// }
+			// if (cacheSubsTimeoutInSecoinds < 5) {
+			// cacheSubsTimeoutInSecoinds = 5;
+			// }
 
-			//
-			log.debug("options: {}", toJson().encodePrettily());
+			// log.debug("options: {}", toJson().encodePrettily());
+			return this;
 		}
 	}
 }

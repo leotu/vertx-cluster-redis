@@ -15,10 +15,12 @@
  */
 package io.vertx.spi.cluster.redis.impl;
 
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import org.redisson.api.RMapCache;
 import org.redisson.api.RedissonClient;
+import org.redisson.client.codec.Codec;
 import org.redisson.client.codec.StringCodec;
 
 import io.vertx.core.Vertx;
@@ -44,23 +46,24 @@ class RedisMapHaInfo extends RedisMap<String, String> implements NodeAttachListe
 	private final int timeToLiveSeconds;
 
 	private final ClusterManager clusterManager;
-	private final RedisMapHaInfoTTLMonitor ttlMonitor;
+	private final HaInfoTTLMonitor ttlMonitor;
 
 	public RedisMapHaInfo(Vertx vertx, ClusterManager clusterManager, RedissonClient redisson, String name,
 			int timeToLiveSeconds, int refreshIntervalSeconds) {
-		super(vertx, redisson, name);
+		super(vertx, redisson, name, null);
 		this.clusterManager = clusterManager;
 		this.timeToLiveSeconds = timeToLiveSeconds;
-		this.ttlMonitor = new RedisMapHaInfoTTLMonitor(vertx, this.clusterManager, redisson, this, this.name,
+		this.ttlMonitor = new HaInfoTTLMonitor(vertx, this.clusterManager, redisson, this, this.name,
 				refreshIntervalSeconds);
+		log.debug("nodeID: {}, timeToLiveSeconds: {}, refreshIntervalSeconds: {}", clusterManager.getNodeID(),
+				timeToLiveSeconds, refreshIntervalSeconds);
 	}
 
 	/**
-	 * @see org.redisson.codec.JsonJacksonCodec
+	 * @see org.redisson.client.codec.StringCodec
 	 */
 	@Override
-	protected RMapCache<String, String> createMap(RedissonClient redisson, String name) {
-		// <String, String>
+	protected RMapCache<String, String> createMap(RedissonClient redisson, String name, Codec codec) {
 		RMapCache<String, String> mapAsync = redisson.getMapCache(name, new StringCodec());
 		return mapAsync;
 	}
@@ -80,6 +83,11 @@ class RedisMapHaInfo extends RedisMap<String, String> implements NodeAttachListe
 
 	public void close() {
 		ttlMonitor.stop();
+	}
+
+	@Override
+	public void putAll(Map<? extends String, ? extends String> m) {
+		throw new UnsupportedOperationException("putAll");
 	}
 
 	/**

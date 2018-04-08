@@ -245,22 +245,12 @@ class PendingMessageProcessorImpl implements PendingMessageProcessor {
 				fu.fail(asyncResult.cause());
 			}
 		};
-		// if (Vertx.currentContext() == null) {
-		// Guarantees the order when there is no current context ?
-		// sendNoContext.runOnContext(v -> {
-		subs.get(address, resultHandler); // create new RedisChoosableSet
-		// });
-		// } else {
-		// subs.get(address, resultHandler);
-		// }
+		subs.get(address, resultHandler);
 		return fu;
 	}
 
 	/**
-	 * Choose new one
-	 * 
-	 * @param originalServerID failed server
-	 * @see io.vertx.spi.cluster.redis.impl.RedisChoosableSet
+	 * vertx.executeBlocking(...)
 	 */
 	private Future<Void> resendToSubs(ServerID failedServerID, ClusteredMessage<?, ?> message,
 			ChoosableIterable<ClusterNodeInfo> subs) {

@@ -15,43 +15,31 @@
  */
 package io.vertx.spi.cluster.redis.impl;
 
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-import org.redisson.Redisson;
-import org.redisson.RedissonMapCache;
-import org.redisson.RedissonObject;
 import org.redisson.api.RMapCache;
 import org.redisson.api.RedissonClient;
-import org.redisson.client.codec.LongCodec;
-import org.redisson.client.protocol.RedisCommands;
+import org.redisson.client.codec.Codec;
 import org.redisson.client.protocol.RedisStrictCommand;
 import org.redisson.client.protocol.convertor.LongReplayConvertor;
-import org.redisson.command.CommandAsyncExecutor;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.util.CharsetUtil;
 import io.vertx.core.AsyncResult;
 import io.vertx.core.Context;
 import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
 import io.vertx.core.shareddata.AsyncMap;
-import io.vertx.spi.cluster.redis.ExpirableAsync;
-import io.vertx.spi.cluster.redis.impl.NonPublicAPI.Reflection;
 
 /**
  *
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
-class RedisAsyncMap<K, V> implements AsyncMap<K, V>, ExpirableAsync<K> {
+class RedisAsyncMap<K, V> implements AsyncMap<K, V> { // extends MapTTL<K, V>
 	// private static final Logger log = LoggerFactory.getLogger(RedisAsyncMap.class);
 
 	protected final RedisStrictCommand<Long> ZSCORE_LONG = new RedisStrictCommand<Long>("ZSCORE",
@@ -62,13 +50,15 @@ class RedisAsyncMap<K, V> implements AsyncMap<K, V>, ExpirableAsync<K> {
 	protected final RMapCache<K, V> map;
 	protected final String name;
 
-	public RedisAsyncMap(Vertx vertx, RedissonClient redisson, String name) {
+	public RedisAsyncMap(Vertx vertx, RedissonClient redisson, String name, Codec codec) {
+		// super(vertx, redisson, name);
 		Objects.requireNonNull(redisson, "redisson");
 		Objects.requireNonNull(name, "name");
 		this.vertx = vertx;
 		this.redisson = redisson;
 		this.name = name;
-		this.map = createRMapCache(this.redisson, this.name);
+		this.map = createRMapCache(this.redisson, this.name, codec);
+		// super.setMap(this.map); // XXX
 	}
 
 	/**
@@ -77,9 +67,14 @@ class RedisAsyncMap<K, V> implements AsyncMap<K, V>, ExpirableAsync<K> {
 	 * @see org.redisson.codec.JsonJacksonCodec
 	 * @see org.redisson.codec.FstCodec
 	 */
-	protected RMapCache<K, V> createRMapCache(RedissonClient redisson, String name) {
-		return redisson.getMapCache(name, new RedisMapCodec());
-		// return redisson.getMapCache(name);
+	protected RMapCache<K, V> createRMapCache(RedissonClient redisson, String name, Codec codec) {
+		if (codec == null) {
+			return redisson.getMapCache(name);
+			// return redisson.getMapCache(name, new RedisMapCodec());
+		} else {
+			return redisson.getMapCache(name, codec);
+		}
+
 	}
 
 	@Override
@@ -202,113 +197,6 @@ class RedisAsyncMap<K, V> implements AsyncMap<K, V>, ExpirableAsync<K> {
 		map.readAllMapAsync().whenComplete((v, e) -> context.runOnContext(vd -> //
 		resultHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(v))) //
 		);
-	}
-
-	/**
-	 * https://redis.io/commands/zadd
-	 * 
-	 * @return TTL in milliseconds
-	 * @see org.redisson.RedissonMapCache#getTimeoutSetNameByKey
-	 * @see org.redisson.RedissonObject#encodeMapKey
-	 */
-	@Override
-	public void refreshIfPresent(K k, long timeToLive, TimeUnit timeUnit, Handler<AsyncResult<Long>> resultHandler) {
-		Context context = vertx.getOrCreateContext();
-		final String key = Reflection.invokeMethod(map, RedissonMapCache.class, "getTimeoutSetNameByKey",
-				new Class<?>[] { Object.class }, new Object[] { name });
-
-		final ByteBuf encodeMapKey = Reflection.invokeMethod(map, RedissonObject.class, "encodeMapKey",
-				new Class<?>[] { Object.class }, new Object[] { k });
-		final String field = encodeMapKey.toString(CharsetUtil.UTF_8);
-
-		final Long ttl = timeUnit.toMillis(timeToLive);
-		long currentTime = System.currentTimeMillis() + ttl;
-
-		// final ByteBuf encodeMapValue = Reflection.callMethod(map, RedissonObject.class, "encodeMapValue",
-		// new Class<?>[] { Object.class }, new Object[] { field });
-
-		final Redisson redissonImpl = ((Redisson) redisson);
-		final CommandAsyncExecutor commandExecutor = redissonImpl.getCommandExecutor();
-
-		// XX: Only update elements that already exist. Never add elements.
-		String zaddOptions = "XX";
-		commandExecutor.writeAsync(key, LongCodec.INSTANCE, RedisCommands.ZADD_INT, key, zaddOptions, currentTime, field)
-				.whenCompleteAsync((value, e) -> {
-					if (e == null) { // java.lang.Boolean / java.lang.Long
-						Long numOfAdded = (Long) value; // num.longValue() == 0
-						// Boolean added = (Boolean) value;
-						context.runOnContext(vd -> resultHandler.handle(Future.succeededFuture(numOfAdded))); // (Boolean) value)
-					} else {
-						context.runOnContext(vd -> resultHandler.handle(Future.failedFuture(e)));
-					}
-				});
-
-	}
-
-	/**
-	 * @return TTL in milliseconds
-	 * @see org.redisson.RedissonMapCache#getTimeoutSetNameByKey
-	 * @see org.redisson.RedissonObject#encodeMapKey
-	 */
-	@Override
-	public void getTTL(K k, Handler<AsyncResult<Long>> resultHandler) {
-		Context context = vertx.getOrCreateContext();
-		getTTL2(k, ar -> {
-			if (ar.failed()) {
-				context.runOnContext(vd -> resultHandler.handle(Future.failedFuture(ar.cause())));
-			} else {
-				context.runOnContext(vd -> resultHandler.handle(Future.succeededFuture(ar.result())));
-			}
-		});
-	}
-
-	private void getTTL2(K k, Handler<AsyncResult<Long>> resultHandler) {
-		// final String key = "redisson__timeout__set:{" + name + "}"; // XXX
-		final String key = Reflection.invokeMethod(map, RedissonMapCache.class, "getTimeoutSetNameByKey",
-				new Class<?>[] { Object.class }, new Object[] { name });
-
-		// final String field = "\"" + k + "\""; // XXX
-		final ByteBuf encodeMapKey = Reflection.invokeMethod(map, RedissonObject.class, "encodeMapKey",
-				new Class<?>[] { Object.class }, new Object[] { k });
-		final String field = encodeMapKey.toString(CharsetUtil.UTF_8);
-
-		final Redisson redissonImpl = ((Redisson) redisson);
-		final CommandAsyncExecutor commandExecutor = redissonImpl.getCommandExecutor();
-
-		commandExecutor.readAsync(key, LongCodec.INSTANCE, ZSCORE_LONG, key, field).whenCompleteAsync((value, e) -> {
-			if (e == null) {
-				if (value == null) {
-					resultHandler.handle(Future.succeededFuture(0L));
-				} else {
-					Long val = (Long) value; //
-					// log.debug("### val: {}", val);
-					if (val.longValue() == 0) {
-						resultHandler.handle(Future.succeededFuture(0L));
-					} else {
-						long nowMillis = System.currentTimeMillis();
-						long valMillis = val;
-						long ttlMillis = valMillis - nowMillis;
-
-						LocalDateTime now = new Date(nowMillis).toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime(); // LocalDateTime.now();
-						LocalDateTime valTime = new Date(val).toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
-						if (now.isAfter(valTime)) {
-							resultHandler.handle(Future.succeededFuture(0L));
-						} else {
-							long nowMilli = now.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
-							long valMilli = valTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
-							long ttl = valMilli - nowMilli;
-							if (ttl != ttlMillis) { // debugging
-								resultHandler.handle(Future
-										.failedFuture(new Exception("(ttl != ttlMillis), ttl: " + ttl + ", ttlMillis: " + ttlMillis)));
-							}
-							resultHandler.handle(Future.succeededFuture(ttl <= 0 ? 0 : ttl));
-						}
-					}
-				}
-			} else {
-				resultHandler.handle(Future.failedFuture(e));
-			}
-		});
 	}
 
 	@Override

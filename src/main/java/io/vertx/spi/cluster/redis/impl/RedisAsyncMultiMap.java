@@ -28,6 +28,7 @@ import java.util.function.Predicate;
 import org.redisson.api.RBatch;
 import org.redisson.api.RSetMultimap;
 import org.redisson.api.RedissonClient;
+import org.redisson.client.codec.Codec;
 
 import io.vertx.core.AsyncResult;
 import io.vertx.core.CompositeFuture;
@@ -35,8 +36,6 @@ import io.vertx.core.Context;
 import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
-//import org.slf4j.Logger;
-//import org.slf4j.LoggerFactory;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.spi.cluster.AsyncMultiMap;
@@ -50,7 +49,7 @@ import io.vertx.core.spi.cluster.ChoosableIterable;
  */
 class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 	private static final Logger log = LoggerFactory.getLogger(RedisAsyncMultiMap.class);
-	private static boolean debug = false;
+	// private static boolean debug = false;
 
 	protected ConcurrentMap<K, AtomicReference<RedisChoosableSet<V>>> choosableSetPtr = new ConcurrentHashMap<>();
 	protected final RedissonClient redisson;
@@ -58,13 +57,13 @@ class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 	protected final RSetMultimap<K, V> mmap;
 	protected final String name;
 
-	public RedisAsyncMultiMap(Vertx vertx, RedissonClient redisson, String name) {
+	public RedisAsyncMultiMap(Vertx vertx, RedissonClient redisson, String name, Codec codec) {
 		Objects.requireNonNull(redisson, "redisson");
 		Objects.requireNonNull(name, "name");
 		this.vertx = vertx;
 		this.redisson = redisson;
 		this.name = name;
-		this.mmap = createMultimap(this.redisson, this.name);
+		this.mmap = createMultimap(this.redisson, this.name, codec);
 	}
 
 	/**
@@ -72,8 +71,13 @@ class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 	 * 
 	 * @see org.redisson.codec.JsonJacksonCodec
 	 */
-	protected RSetMultimap<K, V> createMultimap(RedissonClient redisson, String name) {
-		return redisson.getSetMultimap(name);
+	protected RSetMultimap<K, V> createMultimap(RedissonClient redisson, String name, Codec codec) {
+		if (codec == null) {
+			return redisson.getSetMultimap(name);
+			// return redisson.getSetMultimapCache(name);
+		} else {
+			return redisson.getSetMultimap(name, codec);
+		}
 	}
 
 	@Override
@@ -96,24 +100,13 @@ class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 			} else {
 				AtomicReference<RedisChoosableSet<V>> currentRef = getCurrentRef(k);
 				RedisChoosableSet<V> newSet = new RedisChoosableSet<>(v, currentRef);
-				RedisChoosableSet<V> current = currentRef.get();
-				if (current != null) {
-					synchronized (current) {
-						if (current.equals(newSet)) {
-							if (debug) {
-								log.debug("(current.equals(newSet)), current: {}", current);
-							}
-							context.runOnContext(vd -> resultHandler.handle(Future.succeededFuture(current)));
-							return;
-						}
-					}
+				// XXX
+				if (!newSet.isNewSet()) {
+					context.runOnContext(vd -> resultHandler.handle(Future.succeededFuture(currentRef.get())));
+				} else {
+					newSet.moveToCurrent();
+					context.runOnContext(vd -> resultHandler.handle(Future.succeededFuture(newSet)));
 				}
-				if (debug) {
-					log.debug("### current.size: {}, current: {}; newSet.size:{}, newSet: {}",
-							current == null ? "<null>" : current.size(), current, newSet.size(), newSet);
-				}
-				newSet.moveToCurrent();
-				context.runOnContext(vd -> resultHandler.handle(Future.succeededFuture(newSet)));
 			}
 		});
 
@@ -236,23 +229,6 @@ class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 		}
 		return currentRef;
 	}
-
-	// static class CurrentChoosableSet<V> {
-	// final RedisChoosableSet<V> ref;
-	// final V value;
-	//
-	// public CurrentChoosableSet(RedisChoosableSet<V> ref, V value) {
-	// Objects.requireNonNull(ref, "ref");
-	// Objects.requireNonNull(value, "value");
-	// this.ref = ref;
-	// this.value = value;
-	// }
-	//
-	// @Override
-	// public String toString() {
-	// return super.toString() + "{value=" + value + ", ref=" + ref + "}";
-	// }
-	// }
 
 	@Override
 	public String toString() {

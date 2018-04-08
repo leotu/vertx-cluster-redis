@@ -23,6 +23,7 @@ import java.util.function.Predicate;
 import org.redisson.api.RBatch;
 import org.redisson.api.RSetMultimap;
 import org.redisson.api.RedissonClient;
+import org.redisson.client.codec.Codec;
 import org.redisson.client.codec.StringCodec;
 import org.redisson.codec.JsonJacksonCodec;
 
@@ -32,8 +33,6 @@ import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
 import io.vertx.core.eventbus.impl.clustered.ClusterNodeInfo;
-//import org.slf4j.Logger;
-//import org.slf4j.LoggerFactory;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.spi.cluster.ClusterManager;
@@ -57,16 +56,17 @@ class RedisAsyncMultiMapSubs extends RedisAsyncMultiMap<String, ClusterNodeInfo>
 	private final ClusterManager clusterManager;
 
 	public RedisAsyncMultiMapSubs(Vertx vertx, ClusterManager clusterManager, RedissonClient redisson, String name) {
-		super(vertx, redisson, name);
+		super(vertx, redisson, name, null);
 		this.clusterManager = clusterManager;
 	}
 
 	/**
+	 * 
+	 * @see org.redisson.client.codec.StringCodec
 	 * @see org.redisson.codec.JsonJacksonCodec
 	 */
 	@Override
-	protected RSetMultimap<String, ClusterNodeInfo> createMultimap(RedissonClient redisson, String name) {
-		// <String, ClusterNodeInfo>
+	protected RSetMultimap<String, ClusterNodeInfo> createMultimap(RedissonClient redisson, String name, Codec codec) {
 		RSetMultimap<String, ClusterNodeInfo> mmap = redisson.getSetMultimap(name, new KeyValueCodec( //
 				JsonJacksonCodec.INSTANCE.getValueEncoder(), //
 				JsonJacksonCodec.INSTANCE.getValueDecoder(), //

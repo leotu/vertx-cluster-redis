@@ -73,4 +73,12 @@ class KeyValueCodec implements Codec {
 		return valueEncoder;
 	}
 
+	@Override
+	public String toString() {
+		return super.toString() + "{valueEncoder=" + valueEncoder.getClass().getName() + ", valueDecoder="
+				+ valueDecoder.getClass().getName() + ", mapKeyEncoder=" + mapKeyEncoder.getClass().getName()
+				+ ", mapKeyDecoder=" + mapKeyDecoder.getClass().getName() + ", mapValueEncoder="
+				+ mapValueEncoder.getClass().getName() + ", mapValueDecoder=" + mapValueDecoder.getClass().getName() + "}";
+	}
+
 }

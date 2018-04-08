@@ -22,6 +22,7 @@ import java.util.Set;
 
 import org.redisson.api.RMap;
 import org.redisson.api.RedissonClient;
+import org.redisson.client.codec.Codec;
 
 import io.vertx.core.Vertx;
 
@@ -35,12 +36,12 @@ class RedisMap<K, V> implements Map<K, V> {
 	protected final RMap<K, V> map;
 	protected final String name;
 
-	public RedisMap(Vertx vertx, RedissonClient redisson, String name) {
+	public RedisMap(Vertx vertx, RedissonClient redisson, String name, Codec codec) {
 		Objects.requireNonNull(redisson, "redisson");
 		Objects.requireNonNull(name, "name");
 		this.vertx = vertx;
 		this.name = name;
-		this.map = createMap(redisson, this.name);
+		this.map = createMap(redisson, this.name, codec);
 	}
 
 	/**
@@ -48,8 +49,12 @@ class RedisMap<K, V> implements Map<K, V> {
 	 * 
 	 * @see org.redisson.codec.JsonJacksonCodec
 	 */
-	protected RMap<K, V> createMap(RedissonClient redisson, String name) {
-		return redisson.getMap(name);
+	protected RMap<K, V> createMap(RedissonClient redisson, String name, Codec codec) {
+		if (codec == null) {
+			return redisson.getMap(name);
+		} else {
+			return redisson.getMap(name, codec);
+		}
 	}
 
 	@Override

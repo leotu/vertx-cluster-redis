@@ -40,6 +40,6 @@ public interface ExpirableAsync<K> {
 	 * @return The number of elements added to the sorted sets, not including elements already existing for which the
 	 *         score was updated
 	 */
-	void refreshIfPresent(K k, long timeToLive, TimeUnit timeUnit, Handler<AsyncResult<Long>> resultHandler);
+	void refreshTTLIfPresent(K k, long timeToLive, TimeUnit timeUnit, Handler<AsyncResult<Long>> resultHandler);
 
 }

@@ -25,6 +25,7 @@ import io.vertx.core.shareddata.AsyncMap;
 import io.vertx.core.spi.cluster.AsyncMultiMap;
 import io.vertx.core.spi.cluster.ClusterManager;
 import io.vertx.core.spi.cluster.NodeListener;
+import io.vertx.spi.cluster.redis.impl.FactoryImpl;
 
 /**
  *
@@ -36,16 +37,17 @@ public interface Factory {
 
 	<K, V> AsyncMultiMap<K, V> createAsyncMultiMap(Vertx vertx, RedissonClient redisson, String name);
 
+	<K, V> Map<K, V> createMap(Vertx vertx, RedissonClient redisson, String name);
+
+	//
 	AsyncMultiMap<String, ClusterNodeInfo> createAsyncMultiMapSubs(Vertx vertx, ClusterManager clusterManager,
 			RedissonClient redisson, String name);
-
-	<K, V> Map<K, V> createMap(Vertx vertx, RedissonClient redisson, String name);
 
 	Map<String, String> createMapHaInfo(Vertx vertx, ClusterManager clusterManager, RedissonClient redisson, String name,
 			int timeToLiveSeconds, int refreshIntervalSeconds);
 
-	<K, V> AsyncMultiMap<K, V> createLocalCachedAsyncMultiMap(Vertx vertx, ClusterManager clusterManager,
-			RedissonClient redisson, AsyncMultiMap<K, V> delegate, int timeoutInSecoinds, String topicName);
+	// <K, V> AsyncMultiMap<K, V> createLocalCachedAsyncMultiMap(Vertx vertx, ClusterManager clusterManager,
+	// RedissonClient redisson, AsyncMultiMap<K, V> delegate, int timeoutInSecoinds, String topicName);
 
 	PendingMessageProcessor createPendingMessageProcessor(Vertx vertx, ClusterManager clusterManager,
 			AsyncMultiMap<String, ClusterNodeInfo> subs);
@@ -60,6 +62,10 @@ public interface Factory {
 
 	interface PendingMessageProcessor {
 		void run(Object serverID, Object connHolder);
+	}
+
+	static public Factory createDefaultFactory() {
+		return new FactoryImpl();
 	}
 
 }
