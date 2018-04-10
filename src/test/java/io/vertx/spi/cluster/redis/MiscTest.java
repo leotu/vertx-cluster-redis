@@ -15,6 +15,10 @@
  */
 package io.vertx.spi.cluster.redis;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.Date;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -37,7 +41,7 @@ public class MiscTest {
 		log = LoggerFactory.getLogger(MiscTest.class);
 	}
 
-	@Test
+	// @Test
 	public void testConcurrentMap() throws Exception {
 		final ConcurrentMap<String, String> cmap = new ConcurrentHashMap<>();
 
@@ -52,6 +56,14 @@ public class MiscTest {
 			return null;
 		});
 		log.debug("cmap.size={}, cmap={}", cmap.size(), cmap);
+	}
 
+	@Test
+	public void testScoe() throws Exception {
+		long lastAccessed = 1523248556694L;
+
+		OffsetDateTime dateTime = OffsetDateTime.ofInstant(new Date(lastAccessed).toInstant(), ZoneId.systemDefault());
+		String str = dateTime.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+		log.debug("lastAccessed={}, str={}", lastAccessed, str);
 	}
 }

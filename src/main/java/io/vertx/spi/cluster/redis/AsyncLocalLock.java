@@ -17,6 +17,7 @@ package io.vertx.spi.cluster.redis;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import io.vertx.core.AsyncResult;
@@ -154,6 +155,6 @@ class AsyncLocalLock {
 	static void acquireLockWithTimeout(Vertx vertx, String key, int timeoutInSeconds,
 			Handler<AsyncResult<Lock>> resultHandler) {
 		AsynchronousLock lock = localLocks.computeIfAbsent(key, n -> new AsynchronousLock(vertx));
-		lock.acquire(timeoutInSeconds * 1000, resultHandler);
+		lock.acquire(TimeUnit.SECONDS.toMillis(timeoutInSeconds), resultHandler);
 	}
 }
