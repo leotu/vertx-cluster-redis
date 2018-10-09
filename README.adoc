@@ -1,6 +1,7 @@
-= Redis Cluster Manager
+= Redis Cluster Manager (deprecated)
 
 This is a cluster manager implementation for Vert.x that uses https://github.com/redisson/redisson/[Redisson].
 
 https://github.com/leotu/vertx-cluster-redis
 
+- Need to refactor code
