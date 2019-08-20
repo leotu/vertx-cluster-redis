@@ -23,6 +23,11 @@ import java.util.StringTokenizer;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 
+import org.junit.Assert;
+import org.junit.FixMethodOrder;
+import org.junit.Test;
+import org.junit.runners.MethodSorters;
+
 //import org.slf4j.Logger;
 //import org.slf4j.LoggerFactory;
 import io.vertx.core.logging.Logger;
@@ -33,6 +38,7 @@ import io.vertx.core.logging.SLF4JLogDelegateFactory;
  * 
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
+@FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class IpUtil {
 	private static final Logger log;
 	static {
@@ -102,7 +108,8 @@ public class IpUtil {
 		}
 	}
 
-	static public void main(String... args) {
+	@Test
+	public void test1True() {
 		log.debug("BEGIN...");
 
 		log.debug("========== true =======");
@@ -117,9 +124,12 @@ public class IpUtil {
 
 		for (String ip : ips) {
 			log.debug("{} = {}", ip, validIpAddress(ip));
-			assert validIpAddress(ip) == true;
+			Assert.assertTrue(validIpAddress(ip));
 		}
-
+	}
+	
+	@Test
+	public void test2False() {
 		log.debug("========== false =======");
 		String[] ips2 = new String[] { //
 				"10.10.10", //
@@ -136,7 +146,7 @@ public class IpUtil {
 				"10.10.10" };
 		for (String ip : ips2) {
 			log.debug("{} = {}", ip, validIpAddress(ip));
-			assert validIpAddress(ip) != true;
+			Assert.assertFalse(validIpAddress(ip));
 		}
 
 		log.debug("END.");
