@@ -4,4 +4,13 @@ This is a cluster manager implementation for Vert.x that uses https://github.com
 
 https://github.com/leotu/vertx-cluster-redis
 
-- Need to refactor code
+- Need to refactoring the code
+- Upgrade to Vert.x 3.7.1
+
+== Test docker
+ 
+[source,bash]
+--------------
+docker pull redis:alpine
+docker run --name demo.redis -e LANG=en.UTF-8 -e LC_ALL=en.UTF-8 -p 6379:6379 -d redis:alpine --requirepass "mypwd"
+--------------

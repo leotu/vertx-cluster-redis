@@ -15,8 +15,6 @@
  */
 package io.vertx.spi.cluster.redis;
 
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -26,7 +24,7 @@ import io.vertx.core.Vertx;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.shareddata.Lock;
-import io.vertx.core.shareddata.impl.AsynchronousLock;
+import io.vertx.core.shareddata.impl.LocalAsyncLocks;
 
 /**
  * Asynchronous Local Lock Utility
@@ -37,7 +35,7 @@ import io.vertx.core.shareddata.impl.AsynchronousLock;
 class AsyncLocalLock {
 	private static final Logger log = LoggerFactory.getLogger(AsyncLocalLock.class);
 
-	static private final ConcurrentMap<String, AsynchronousLock> localLocks = new ConcurrentHashMap<>();
+	private static final LocalAsyncLocks localAsyncLocks = new LocalAsyncLocks();
 
 	/**
 	 * ignore any error
@@ -154,7 +152,6 @@ class AsyncLocalLock {
 	 */
 	static void acquireLockWithTimeout(Vertx vertx, String key, int timeoutInSeconds,
 			Handler<AsyncResult<Lock>> resultHandler) {
-		AsynchronousLock lock = localLocks.computeIfAbsent(key, n -> new AsynchronousLock(vertx));
-		lock.acquire(TimeUnit.SECONDS.toMillis(timeoutInSeconds), resultHandler);
+		localAsyncLocks.acquire(vertx.getOrCreateContext(), key, TimeUnit.SECONDS.toMillis(timeoutInSeconds), resultHandler);
 	}
 }

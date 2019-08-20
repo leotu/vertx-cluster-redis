@@ -64,7 +64,7 @@ class HaInfoTTLMonitor implements NodeAttachListener {
 	private EntryCreatedListener<String, String> nodeCreatedNofity; // join?
 
 	private boolean syncSubs = false;
-	protected final String name;
+	private final String name;
 	private final TTLAgent ttlAgent;
 
 	public HaInfoTTLMonitor(Vertx vertx, ClusterManager clusterManager, RedissonClient redisson,

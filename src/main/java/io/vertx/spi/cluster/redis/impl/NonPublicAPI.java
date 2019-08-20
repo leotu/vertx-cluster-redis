@@ -32,8 +32,8 @@ import io.vertx.core.eventbus.impl.MessageImpl;
 import io.vertx.core.eventbus.impl.clustered.ClusterNodeInfo;
 import io.vertx.core.eventbus.impl.clustered.ClusteredEventBus;
 import io.vertx.core.eventbus.impl.clustered.ClusteredMessage;
-import io.vertx.core.eventbus.impl.clustered.ReflectUtil;
 import io.vertx.core.impl.HAManager;
+import io.vertx.core.impl.VertxImpl;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.net.impl.ServerID;
@@ -52,7 +52,7 @@ class NonPublicAPI {
 	public static final String EB_SUBS_MAP_NAME; // "__vertx.subs"
 
 	static {
-		HA_CLUSTER_MAP_NAME = Reflection.getStaticFinalField(HAManager.class, "CLUSTER_MAP_NAME");
+		HA_CLUSTER_MAP_NAME = Reflection.getStaticFinalField(VertxImpl.class, "CLUSTER_MAP_NAME");
 		EB_SERVER_ID_HA_KEY = Reflection.getStaticFinalField(ClusteredEventBus.class, "SERVER_ID_HA_KEY");
 		EB_SUBS_MAP_NAME = Reflection.getStaticFinalField(ClusteredEventBus.class, "SUBS_MAP_NAME");
 	}
@@ -95,7 +95,7 @@ class NonPublicAPI {
 		 * self
 		 */
 		public static ServerID serverID(ClusteredEventBus eventBus) {
-			return ReflectUtil.getFinalField(eventBus, ClusteredEventBus.class, "serverID");
+			return Reflection.getFinalField(eventBus, ClusteredEventBus.class, "serverID");
 		}
 
 		/**

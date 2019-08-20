@@ -51,7 +51,7 @@ class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 	private static final Logger log = LoggerFactory.getLogger(RedisAsyncMultiMap.class);
 	// private static boolean debug = false;
 
-	protected ConcurrentMap<K, AtomicReference<RedisChoosableSet<V>>> choosableSetPtr = new ConcurrentHashMap<>();
+	protected final ConcurrentMap<K, AtomicReference<RedisChoosableSet<V>>> choosableSetPtr = new ConcurrentHashMap<>();
 	protected final RedissonClient redisson;
 	protected final Vertx vertx;
 	protected final RSetMultimap<K, V> mmap;

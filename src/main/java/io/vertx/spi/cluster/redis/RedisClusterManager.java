@@ -65,14 +65,14 @@ public class RedisClusterManager implements ClusterManager {
 	private final RedissonClient redisson;
 	private final Options options;
 
-	private AtomicBoolean active = new AtomicBoolean();
+	private final AtomicBoolean active = new AtomicBoolean();
 	private NodeListener nodeListener;
 	private Map<String, String> haInfo;
 	private AsyncMultiMap<String, ClusterNodeInfo> subs;
 
-	private ConcurrentMap<String, Map<?, ?>> mapCache = new ConcurrentHashMap<>();
-	private ConcurrentMap<String, AsyncMap<?, ?>> asyncMapCache = new ConcurrentHashMap<>();
-	private ConcurrentMap<String, AsyncMultiMap<?, ?>> asyncMultiMapCache = new ConcurrentHashMap<>();
+	private final ConcurrentMap<String, Map<?, ?>> mapCache = new ConcurrentHashMap<>();
+	private final ConcurrentMap<String, AsyncMap<?, ?>> asyncMapCache = new ConcurrentHashMap<>();
+	private final ConcurrentMap<String, AsyncMultiMap<?, ?>> asyncMultiMapCache = new ConcurrentHashMap<>();
 
 	public RedisClusterManager(RedissonClient redisson, String nodeId) {
 		this(redisson, new Options().nodeId(nodeId));
@@ -102,15 +102,17 @@ public class RedisClusterManager implements ClusterManager {
 	public <K, V> void getAsyncMultiMap(String name, Handler<AsyncResult<AsyncMultiMap<K, V>>> resultHandler) {
 		vertx.executeBlocking(future -> {
 			if (name.equals(SUBS_MAP_NAME)) {
-				if (subs == null) {
-					subs = factory.createAsyncMultiMapSubs(vertx, this, redisson, name);
-					// if (options.enableCacheSubs) {
-					// subs = factory.createLocalCachedAsyncMultiMap(vertx, this, redisson, subs,
-					// options.cacheSubsTimeoutInSecoinds, options.cacheSubsTopicName);
-					// }
-					factory.createPendingMessageProcessor(vertx, this, subs); // XXX: EventBus ready been created
+				synchronized (this) {
+				    if (subs == null) {
+					    subs = factory.createAsyncMultiMapSubs(vertx, this, redisson, name);
+					    // if (options.enableCacheSubs) {
+					    // subs = factory.createLocalCachedAsyncMultiMap(vertx, this, redisson, subs,
+					    // options.cacheSubsTimeoutInSecoinds, options.cacheSubsTopicName);
+					    // }
+					    factory.createPendingMessageProcessor(vertx, this, subs); // XXX: EventBus ready been created
+				    }
+				    future.complete((AsyncMultiMap<K, V>) subs);
 				}
-				future.complete((AsyncMultiMap<K, V>) subs);
 			} else {
 				AsyncMultiMap<K, V> asyncMultiMap = (AsyncMultiMap<K, V>) asyncMultiMapCache.computeIfAbsent(name,
 						key -> factory.createAsyncMultiMap(vertx, redisson, name));
@@ -142,11 +144,13 @@ public class RedisClusterManager implements ClusterManager {
 	@Override
 	public <K, V> Map<K, V> getSyncMap(String name) {
 		if (name.equals(CLUSTER_MAP_NAME)) {
-			if (haInfo == null) {
-				haInfo = factory.createMapHaInfo(vertx, this, redisson, name, options.haInfoTimeToLiveSeconds,
+			synchronized (this) {
+			    if (haInfo == null) {
+				    haInfo = factory.createMapHaInfo(vertx, this, redisson, name, options.haInfoTimeToLiveSeconds,
 						options.haInfoRefreshIntervalSeconds);
-			}
-			return (Map<K, V>) haInfo;
+			    }
+			    return (Map<K, V>) haInfo;
+			}    
 		} else {
 			Map<K, V> map = (Map<K, V>) mapCache.computeIfAbsent(name, key -> factory.createMap(vertx, redisson, name));
 			return map;
@@ -203,6 +207,11 @@ public class RedisClusterManager implements ClusterManager {
 	 */
 	@Override
 	public void nodeListener(NodeListener nodeListener) {
+		if (this.nodeListener != null) {
+			log.warn("(this.nodeListener != null)");
+			return;
+		}
+		
 		this.nodeListener = new NodeListener() {
 			@Override
 			synchronized public void nodeAdded(String nodeId) {
