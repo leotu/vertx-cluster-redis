@@ -21,6 +21,8 @@ import java.util.concurrent.CountDownLatch;
 
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.FixMethodOrder;
+import org.junit.runners.MethodSorters;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
@@ -32,6 +34,7 @@ import io.vertx.ext.web.sstore.ClusteredSessionHandlerTest;
  * 
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
+@FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class RedisClusteredSessionHandlerTest extends ClusteredSessionHandlerTest {
 	// private static final Logger log = LoggerFactory.getLogger(RedisClusteredSessionHandlerTest.class);
 
@@ -43,6 +46,7 @@ public class RedisClusteredSessionHandlerTest extends ClusteredSessionHandlerTes
 		config.useSingleServer() //
 				.setAddress("redis://127.0.0.1:6379") //
 				.setDatabase(1) //
+				.setPassword("mypwd") //
 				.setConnectionMinimumIdleSize(5);
 		redisson = Redisson.create(config);
 	}
