@@ -20,7 +20,7 @@ import io.vertx.core.eventbus.impl.clustered.ClusterNodeInfo;
 import io.vertx.core.spi.cluster.AsyncMultiMap;
 import io.vertx.core.spi.cluster.ClusterManager;
 import io.vertx.spi.cluster.redis.impl.support.FactorySupportImpl;
- 
+
 /**
  *
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
@@ -37,4 +37,5 @@ public interface FactorySupport {
 	static public FactorySupport createDefaultFactorySupport() {
 		return new FactorySupportImpl();
 	}
+	
 }

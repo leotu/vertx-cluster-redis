@@ -107,7 +107,7 @@ public class RetriableSenderTest extends AsyncTestBase {
 		AtomicInteger replyCountdown = new AtomicInteger(maxCount);
 		Vertx vertx = vertx2.get();
 		String address = "Retriable";
-
+		
 		log.debug("send...");
 		new Thread( () -> {
 			for (int i = 0; i < maxCount; i++) {
@@ -115,7 +115,7 @@ public class RetriableSenderTest extends AsyncTestBase {
 					log.debug("{}, send message", i);
 					sleep("send: " + i, 20);
 				}
-				sleep("send:" + i, 1000);
+				sleep("send:" + i, 100);
 				vertx.eventBus().<String>send(address, "hello:" + i, ar -> {
 					if (replyCountdown.get() % 1000 == 0) {
 						log.debug("{}, reply message", replyCountdown);

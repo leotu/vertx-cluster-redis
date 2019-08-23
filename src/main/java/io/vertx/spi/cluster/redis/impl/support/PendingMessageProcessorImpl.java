@@ -16,6 +16,7 @@
 package io.vertx.spi.cluster.redis.impl.support;
 
 import java.lang.reflect.InvocationTargetException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 //import io.vertx.core.logging.Logger;
 //import io.vertx.core.logging.LoggerFactory;
@@ -82,8 +83,8 @@ class PendingMessageProcessorImpl implements PendingMessageProcessor {
 				if (!msg.isFromWire() && !PING_ADDRESS.equals(msg.address())
 						&& !msg.address().startsWith(GENERATED_REPLY_ADDRESS_PREFIX) //
 						&& !(msg.writeHandler() instanceof PendingWriteHandler) && !fromRetry) {
-					log.debug("address: {}, fromRetry: {}, fromWire: {}, replyAddress: {}", msg.address(), fromRetry,
-							msg.isFromWire(), msg.replyAddress());
+//					log.debug("address: {}, fromRetry: {}, fromWire: {}, replyAddress: {}", msg.address(), fromRetry,
+//							msg.isFromWire(), msg.replyAddress());
 					PendingWriteHandler pendingWriteHandler = new PendingWriteHandler(vertx, ctx, msg);
 					NonPublicAPI.Reflection.setField(msg, MessageImpl.class, "writeHandler", pendingWriteHandler);
 				}
@@ -116,14 +117,14 @@ class PendingMessageProcessorImpl implements PendingMessageProcessor {
 
 		@Override
 		public void handle(AsyncResult<Void> ar) {
-			boolean retriable = false;
+//			boolean retriable = false;
 			if (wrapWriteHandler == null) {
 				if (ar.failed()) {
 					if (isConnectionRefusedErr(ar.cause())) {
 //						log.warn("<< isConnectionRefusedErr msg.address: " + msg.address() + ", result failed!",
 //								ar.cause());
-						retriable = true;
-						action(vertx, msg);
+//						retriable = true;
+						action(vertx, msg, ar.cause());
 					}
 				}
 			} else {
@@ -134,8 +135,8 @@ class PendingMessageProcessorImpl implements PendingMessageProcessor {
 //						log.warn("<< isConnectionRefusedErr msg.address: {}, result failed: {}", msg.address(),
 //								ar.cause().toString());
 						wrapWriteHandler.handle(Future.failedFuture(ar.cause()));
-						retriable = true;
-						action(vertx, msg);
+//						retriable = true;
+						action(vertx, msg, ar.cause());
 					}
 					else {
 						wrapWriteHandler.handle(Future.failedFuture(ar.cause()));
@@ -145,7 +146,7 @@ class PendingMessageProcessorImpl implements PendingMessageProcessor {
 		}
 	}
 
-	private void action(Vertx vertx, ClusteredMessage<?, ?> msg) {
+	private void action(Vertx vertx, ClusteredMessage<?, ?> msg, Throwable err) {
 		msg.headers().set(retryHeaderKey, msg.address());
 
 		int fromRetryCounter = 0;
@@ -156,6 +157,7 @@ class PendingMessageProcessorImpl implements PendingMessageProcessor {
 		}
 		// log.debug("<< OutboundInterceptor msg.address: {}, fromRetryCounter: {}", msg.address(), fromRetryCounter);
 		msg.headers().set(retryCounterHeaderKey, String.valueOf(fromRetryCounter + 1));
+		msg.fail(-2, err.getMessage()); // Reply
 	}
 
 	private boolean isConnectionRefusedErr(Throwable e) {
