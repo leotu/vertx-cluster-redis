@@ -40,7 +40,8 @@ import io.vertx.core.shareddata.AsyncMap;
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
 class RedisAsyncMap<K, V> implements AsyncMap<K, V> { // extends MapTTL<K, V>
-	// private static final Logger log = LoggerFactory.getLogger(RedisAsyncMap.class);
+	// private static final Logger log =
+	// LoggerFactory.getLogger(RedisAsyncMap.class);
 
 	protected final RedisStrictCommand<Long> ZSCORE_LONG = new RedisStrictCommand<Long>("ZSCORE",
 			new LongReplayConvertor()); // RedisCommands.ZSCORE
@@ -69,12 +70,10 @@ class RedisAsyncMap<K, V> implements AsyncMap<K, V> { // extends MapTTL<K, V>
 	 */
 	protected RMapCache<K, V> createRMapCache(RedissonClient redisson, String name, Codec codec) {
 		if (codec == null) {
-			return redisson.getMapCache(name);
-			// return redisson.getMapCache(name, new RedisMapCodec());
+			return redisson.getMapCache(name); // redisson.getMapCache(name, new RedisMapCodec());
 		} else {
 			return redisson.getMapCache(name, codec);
 		}
-
 	}
 
 	@Override
@@ -118,9 +117,10 @@ class RedisAsyncMap<K, V> implements AsyncMap<K, V> { // extends MapTTL<K, V>
 	@Override
 	public void putIfAbsent(K k, V v, long ttl, Handler<AsyncResult<V>> completionHandler) {
 		Context context = vertx.getOrCreateContext();
-		map.putIfAbsentAsync(k, v, ttl, TimeUnit.MILLISECONDS).whenComplete((previousValue, e) -> context.runOnContext(vd -> //
-		completionHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(previousValue))) //
-		);
+		map.putIfAbsentAsync(k, v, ttl, TimeUnit.MILLISECONDS)
+				.whenComplete((previousValue, e) -> context.runOnContext(vd -> //
+				completionHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(previousValue))) //
+				);
 	}
 
 	@Override

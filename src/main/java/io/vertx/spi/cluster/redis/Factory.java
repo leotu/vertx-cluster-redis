@@ -39,31 +39,16 @@ public interface Factory {
 
 	<K, V> Map<K, V> createMap(Vertx vertx, RedissonClient redisson, String name);
 
-	//
 	AsyncMultiMap<String, ClusterNodeInfo> createAsyncMultiMapSubs(Vertx vertx, ClusterManager clusterManager,
 			RedissonClient redisson, String name);
 
-	Map<String, String> createMapHaInfo(Vertx vertx, ClusterManager clusterManager, RedissonClient redisson, String name,
-			int timeToLiveSeconds, int refreshIntervalSeconds);
-
-	// <K, V> AsyncMultiMap<K, V> createLocalCachedAsyncMultiMap(Vertx vertx, ClusterManager clusterManager,
-	// RedissonClient redisson, AsyncMultiMap<K, V> delegate, int timeoutInSecoinds, String topicName);
-
-	PendingMessageProcessor createPendingMessageProcessor(Vertx vertx, ClusterManager clusterManager,
-			AsyncMultiMap<String, ClusterNodeInfo> subs);
-
-	interface LocalCached {
-		void discard();
-	}
+	Map<String, String> createMapHaInfo(Vertx vertx, ClusterManager clusterManager, RedissonClient redisson,
+			String name);
 
 	interface NodeAttachListener {
 		void attachListener(NodeListener nodeListener);
 	}
-
-	interface PendingMessageProcessor {
-		void run(Object serverID, Object connHolder);
-	}
-
+	
 	static public Factory createDefaultFactory() {
 		return new FactoryImpl();
 	}

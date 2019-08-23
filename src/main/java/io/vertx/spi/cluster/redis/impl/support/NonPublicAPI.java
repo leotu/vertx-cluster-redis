@@ -13,7 +13,7 @@
  *
  * You may elect to redistribute this code under either of these licenses.
  */
-package io.vertx.spi.cluster.redis.impl;
+package io.vertx.spi.cluster.redis.impl.support;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -33,7 +33,6 @@ import io.vertx.core.eventbus.impl.clustered.ClusterNodeInfo;
 import io.vertx.core.eventbus.impl.clustered.ClusteredEventBus;
 import io.vertx.core.eventbus.impl.clustered.ClusteredMessage;
 import io.vertx.core.impl.HAManager;
-import io.vertx.core.impl.VertxImpl;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.net.impl.ServerID;
@@ -47,15 +46,15 @@ import io.vertx.core.spi.cluster.ClusterManager;
 class NonPublicAPI {
 	// private static final Logger log = LoggerFactory.getLogger(NonPublicAPI.class);
 
-	public static final String HA_CLUSTER_MAP_NAME; // "__vertx.haInfo"
-	public static final String EB_SERVER_ID_HA_KEY; // "server_id"
-	public static final String EB_SUBS_MAP_NAME; // "__vertx.subs"
-
-	static {
-		HA_CLUSTER_MAP_NAME = Reflection.getStaticFinalField(VertxImpl.class, "CLUSTER_MAP_NAME");
-		EB_SERVER_ID_HA_KEY = Reflection.getStaticFinalField(ClusteredEventBus.class, "SERVER_ID_HA_KEY");
-		EB_SUBS_MAP_NAME = Reflection.getStaticFinalField(ClusteredEventBus.class, "SUBS_MAP_NAME");
-	}
+//	public static final String HA_CLUSTER_MAP_NAME; // "__vertx.haInfo"
+//	public static final String EB_SERVER_ID_HA_KEY; // "server_id"
+//	public static final String EB_SUBS_MAP_NAME; // "__vertx.subs"
+//
+//	static {
+//		HA_CLUSTER_MAP_NAME = Reflection.getStaticFinalField(VertxImpl.class, "CLUSTER_MAP_NAME");
+//		EB_SERVER_ID_HA_KEY = Reflection.getStaticFinalField(ClusteredEventBus.class, "SERVER_ID_HA_KEY");
+//		EB_SUBS_MAP_NAME = Reflection.getStaticFinalField(ClusteredEventBus.class, "SUBS_MAP_NAME");
+//	}
 
 	/**
 	 * 
@@ -107,6 +106,10 @@ class NonPublicAPI {
 			 * ConnectionHolder's pending
 			 */
 			public static Queue<ClusteredMessage<?, ?>> pending(Object connHolder) {
+//				if (connHolder instanceof ConnectionHolderExt) {
+//					return Reflection.getField(connHolder, connHolder.getClass().getSuperclass(), "pending");
+//				}
+				
 				if (!connHolder.getClass().getName().equals("io.vertx.core.eventbus.impl.clustered.ConnectionHolder")) {
 					throw new IllegalArgumentException(
 							"Only support type: io.vertx.core.eventbus.impl.clustered.ConnectionHolder, but parameter's type is: "
@@ -119,6 +122,10 @@ class NonPublicAPI {
 			 * ConnectionHolder's serverID
 			 */
 			public static ServerID serverID(Object connHolder) {
+//				if (connHolder instanceof ConnectionHolderExt) {
+//					return Reflection.getField(connHolder, connHolder.getClass().getSuperclass(), "serverID");
+//				}
+				
 				if (!connHolder.getClass().getName().equals("io.vertx.core.eventbus.impl.clustered.ConnectionHolder")) {
 					throw new IllegalArgumentException(
 							"Only support type: io.vertx.core.eventbus.impl.clustered.ConnectionHolder, but parameter's type is: "
@@ -220,6 +227,37 @@ class NonPublicAPI {
 				} finally {
 					field.setAccessible(keepStatus);
 					modifiersField.setInt(field, field.getModifiers() & Modifier.FINAL);
+				}
+			} catch (Exception e) {
+				Throwable t = e.getCause() != null && e instanceof InvocationTargetException ? e.getCause() : e;
+				throw new RuntimeException(fieldName, t);
+			}
+		}
+		
+		/**
+		 * If the underlying field is a static field, the reflectObj argument is ignored; it may be null.
+		 *
+		 * @param reflectObj
+		 *            may be null.
+		 */
+		static public void setField(Object reflectObj, Class<?> clsObj, String fieldName, Object newValue) {
+			if (clsObj == null) {
+				throw new IllegalArgumentException("(clsObj == null)");
+			}
+			if (fieldName == null || fieldName.length() == 0) {
+				throw new IllegalArgumentException("(fieldName == null || fieldName.length() == 0), fieldName=["
+						+ fieldName + "]");
+			}
+			try {
+				Field field = clsObj.getDeclaredField(fieldName);
+				boolean keepStatus = field.isAccessible();
+				if (!keepStatus) {
+					field.setAccessible(true);
+				}
+				try {
+					field.set(reflectObj, newValue);
+				} finally {
+					field.setAccessible(keepStatus);
 				}
 			} catch (Exception e) {
 				Throwable t = e.getCause() != null && e instanceof InvocationTargetException ? e.getCause() : e;

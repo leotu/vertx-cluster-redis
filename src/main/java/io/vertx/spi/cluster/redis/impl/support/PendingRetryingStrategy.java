@@ -1,20 +1,23 @@
-package io.vertx.spi.cluster.redis.impl;
+package io.vertx.spi.cluster.redis.impl.support;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentMap;
 
+//import io.vertx.core.logging.Logger;
+//import io.vertx.core.logging.LoggerFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import io.vertx.core.Future;
 import io.vertx.core.MultiMap;
 import io.vertx.core.eventbus.Message;
 import io.vertx.core.eventbus.impl.clustered.ClusterNodeInfo;
 import io.vertx.core.eventbus.impl.clustered.ClusteredMessage;
-import io.vertx.core.logging.Logger;
-import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.net.impl.ServerID;
 import io.vertx.core.spi.cluster.ChoosableIterable;
-import io.vertx.spi.cluster.redis.impl.NonPublicAPI.ClusteredEventBusAPI.ConnectionHolderAPI;
+import io.vertx.spi.cluster.redis.impl.support.NonPublicAPI.ClusteredEventBusAPI.ConnectionHolderAPI;
 
 /**
  * Pending Message Retrying Strategy
@@ -24,7 +27,7 @@ import io.vertx.spi.cluster.redis.impl.NonPublicAPI.ClusteredEventBusAPI.Connect
 class PendingRetryingStrategy {
 	private static final Logger log = LoggerFactory.getLogger(PendingRetryingStrategy.class);
 
-	private static boolean debug = false;
+	private static boolean debug = true;
 
 	final static private String HA_RETRY_SERVER_ID_KEY = "__HA_RETRY_SERVER_ID";
 	final static private String HA_RETRY_DISCARD_MESSAGE_KEY = "__HA_RETRY_DISCARD_MESSAGE";
@@ -43,6 +46,7 @@ class PendingRetryingStrategy {
 	/**
 	 * Let it <code>vertx.executeBlocking(...)</code>
 	 */
+	@SuppressWarnings("deprecation")
 	protected Future<ServerID> next(ServerID failedServerID, ClusteredMessage<?, ?> message,
 			ChoosableIterable<ClusterNodeInfo> subs) {
 

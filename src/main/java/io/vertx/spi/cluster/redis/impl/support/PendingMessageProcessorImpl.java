@@ -13,7 +13,7 @@
  *
  * You may elect to redistribute this code under either of these licenses.
  */
-package io.vertx.spi.cluster.redis.impl;
+package io.vertx.spi.cluster.redis.impl.support;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -21,6 +21,11 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentMap;
+
+//import io.vertx.core.logging.Logger;
+//import io.vertx.core.logging.LoggerFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import io.vertx.core.AsyncResult;
 import io.vertx.core.CompositeFuture;
@@ -31,18 +36,16 @@ import io.vertx.core.Vertx;
 import io.vertx.core.eventbus.impl.clustered.ClusterNodeInfo;
 import io.vertx.core.eventbus.impl.clustered.ClusteredEventBus;
 import io.vertx.core.eventbus.impl.clustered.ClusteredMessage;
-import io.vertx.core.logging.Logger;
-import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.net.impl.ServerID;
 import io.vertx.core.spi.cluster.AsyncMultiMap;
 import io.vertx.core.spi.cluster.ChoosableIterable;
 import io.vertx.core.spi.cluster.ClusterManager;
-import io.vertx.spi.cluster.redis.Factory.PendingMessageProcessor;
-import io.vertx.spi.cluster.redis.impl.NonPublicAPI.ClusteredEventBusAPI;
-import io.vertx.spi.cluster.redis.impl.NonPublicAPI.ClusteredEventBusAPI.ConnectionHolderAPI;
+import io.vertx.spi.cluster.redis.FactorySupport.PendingMessageProcessor;
+import io.vertx.spi.cluster.redis.impl.support.NonPublicAPI.ClusteredEventBusAPI;
+import io.vertx.spi.cluster.redis.impl.support.NonPublicAPI.ClusteredEventBusAPI.ConnectionHolderAPI;
 
 /**
- * Tryable to choose another server ID
+ * Retryable to choose another server ID
  * 
  * @see io.vertx.core.eventbus.impl.clustered.ConnectionHolder#close
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
@@ -50,7 +53,7 @@ import io.vertx.spi.cluster.redis.impl.NonPublicAPI.ClusteredEventBusAPI.Connect
 class PendingMessageProcessorImpl implements PendingMessageProcessor {
 	private static final Logger log = LoggerFactory.getLogger(PendingMessageProcessorImpl.class);
 
-	private static boolean debug = false;
+	private static boolean debug = true;
 
 	private final Vertx vertx;
 	private final ClusteredEventBus eventBus;
@@ -84,6 +87,7 @@ class PendingMessageProcessorImpl implements PendingMessageProcessor {
 
 	@Override
 	public void run(Object failedServerID, Object connHolder) {
+		log.debug("failedServerID: {}, connHolder: {}", failedServerID, connHolder);
 		initIfNeeded();
 
 		Objects.requireNonNull(failedServerID, "failedServerID");
@@ -96,6 +100,7 @@ class PendingMessageProcessorImpl implements PendingMessageProcessor {
 					+ ", holderServerID: " + holderServerID);
 		}
 		if (pending != null && !pending.isEmpty()) {
+			log.debug("failedServerID: {}, pending.size: {}", failedServerID, pending.size());
 			Future<Void> fu = process((ServerID) failedServerID, pending);
 			fu.setHandler(ar -> {
 				if (ar.failed()) {
@@ -111,8 +116,7 @@ class PendingMessageProcessorImpl implements PendingMessageProcessor {
 	 * 
 	 * @param serverID failedServerID
 	 */
-	@SuppressWarnings({ "rawtypes", "unchecked" })
-
+	@SuppressWarnings({ "rawtypes", "unchecked", "deprecation" })
 	private Future<Void> process(ServerID failedServerID, Queue<ClusteredMessage<?, ?>> pending) {
 		Objects.requireNonNull(failedServerID, "failedServerID");
 		Objects.requireNonNull(pending, "pending");
@@ -169,7 +173,7 @@ class PendingMessageProcessorImpl implements PendingMessageProcessor {
 		return complete(pendingSize, completeFutures, Future.future());
 	}
 
-	@SuppressWarnings("rawtypes")
+	@SuppressWarnings({ "rawtypes", "deprecation" })
 	private Future complete(int pendingSize, List<Future> completeFutures, Future future) {
 		CompositeFuture.join(completeFutures).setHandler(ar -> {
 			// if (ar.failed()) { // All completed and at least one faileds
@@ -177,27 +181,27 @@ class PendingMessageProcessorImpl implements PendingMessageProcessor {
 			// }
 			int failedCounter = 0;
 			int discardCounter = 0;
-			int sureSendedCounter = 0;
-			int notSendedCounter = 0;
+			int sureSentCounter = 0;
+			int notSentCounter = 0;
 			for (Future f : completeFutures) {
 				if (f.failed()) {
 					failedCounter++;
 				} else {
 					int status = (Integer) f.result();
 					if (status == 1) {
-						sureSendedCounter++;
+						sureSentCounter++;
 					} else if (status == 0) {
-						notSendedCounter++;
+						notSentCounter++;
 					} else {
 						discardCounter++;
 					}
 				}
 			}
 			if (debug) {
-				if (pendingSize != (failedCounter + discardCounter + sureSendedCounter + notSendedCounter)) {
+				if (pendingSize != (failedCounter + discardCounter + sureSentCounter + notSentCounter)) {
 					log.debug(
-							"messages pendingSize: {}, discardCounter: {}, failedCounter: {}, sureSendedCounter: {}, notSendedCounter: {}",
-							pendingSize, discardCounter, failedCounter, sureSendedCounter, notSendedCounter);
+							"messages pendingSize: {}, discardCounter: {}, failedCounter: {}, sureSentCounter: {}, notSentCounter: {}",
+							pendingSize, discardCounter, failedCounter, sureSentCounter, notSentCounter);
 				}
 			}
 			future.complete();
@@ -221,6 +225,7 @@ class PendingMessageProcessorImpl implements PendingMessageProcessor {
 		return strategy.isDiscardMessage(message);
 	}
 
+	@SuppressWarnings("deprecation")
 	private Future<Boolean> resend(ServerID failedServerID, ClusteredMessage<?, ?> message) {
 		String address = message.address();
 		Future<Boolean> fu = Future.future();
@@ -252,6 +257,7 @@ class PendingMessageProcessorImpl implements PendingMessageProcessor {
 	/**
 	 * vertx.executeBlocking(...)
 	 */
+	@SuppressWarnings("deprecation")
 	private Future<Void> resendToSubs(ServerID failedServerID, ClusteredMessage<?, ?> message,
 			ChoosableIterable<ClusterNodeInfo> subs) {
 		Future<Void> fu = Future.future();

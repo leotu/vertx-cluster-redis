@@ -16,7 +16,6 @@
 
 package io.vertx.spi.cluster.redis;
 
-import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 
 import org.junit.AfterClass;
@@ -69,8 +68,7 @@ public class RedisClusteredSessionHandlerTest extends ClusteredSessionHandlerTes
 
 	@Override
 	protected ClusterManager getClusterManager() {
-		String nodeID = UUID.randomUUID().toString();
-		return new RedisClusterManager(redisson, nodeID);
+		return new RedisClusterManager(redisson);
 	}
 
 }

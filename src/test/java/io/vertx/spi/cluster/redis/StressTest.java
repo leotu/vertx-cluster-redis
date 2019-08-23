@@ -16,6 +16,7 @@
 
 package io.vertx.spi.cluster.redis;
 
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -45,6 +46,7 @@ import io.vertx.test.core.AsyncTestBase;
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
+@SuppressWarnings("deprecation")
 public class StressTest extends AsyncTestBase {
 	private static final Logger log = LoggerFactory.getLogger(StressTest.class);
 //	private static final Logger log;
@@ -61,9 +63,9 @@ public class StressTest extends AsyncTestBase {
 				.setDatabase(1) //
 				.setPassword("mypwd") //
 				.setTcpNoDelay(true) //
-				.setDnsMonitoring(false) //
 				.setKeepAlive(true) //
 				.setConnectionPoolSize(128) //
+				.setTimeout(1000 * 5) //
 				.setConnectionMinimumIdleSize(5);
 		return Redisson.create(config);
 	}
@@ -91,24 +93,29 @@ public class StressTest extends AsyncTestBase {
 
 		VertxOptions options1 = new VertxOptions().setClusterManager(mgr1);
 		options1.getEventBusOptions().setClustered(true).setHost(clusterHost1).setPort(clusterPort1);
+		options1.setInternalBlockingPoolSize(VertxOptions.DEFAULT_INTERNAL_BLOCKING_POOL_SIZE * 2)
+				.setWorkerPoolSize(VertxOptions.DEFAULT_WORKER_POOL_SIZE * 2);
 
 		VertxOptions options2 = new VertxOptions().setClusterManager(mgr2);
 		options2.getEventBusOptions().setClustered(true).setHost(clusterHost2).setPort(clusterPort2);
+		options2.setInternalBlockingPoolSize(VertxOptions.DEFAULT_INTERNAL_BLOCKING_POOL_SIZE * 2)
+				.setWorkerPoolSize(VertxOptions.DEFAULT_WORKER_POOL_SIZE * 2);
 
 		AtomicReference<Vertx> vertx1 = new AtomicReference<>();
 		AtomicReference<Vertx> vertx2 = new AtomicReference<>();
 
-		int maxCount = 57_000; // raise error: 60_000, 58_000; ok: 57_000
+		int maxCount = 57_000; // raise error: 60_000; ok: 57_000
 		AtomicInteger counter = new AtomicInteger(maxCount);
+		String address = UUID.randomUUID().toString();
 
 		// Receiver
 		Vertx.clusteredVertx(options1, res -> {
 			assertTrue(res.succeeded());
 			assertNotNull(mgr1.getNodeID());
 
-			res.result().eventBus().<String>consumer("news", message -> {
+			res.result().eventBus().<String>consumer(address, message -> {
 				assertNotNull(message);
-				if (counter.get() % 1000 == 0) {
+				if (counter.get() % 500 == 0) {
 					log.debug("{}, received message", counter);
 				}
 				assertTrue(message.body().startsWith("hello"));
@@ -137,30 +144,18 @@ public class StressTest extends AsyncTestBase {
 
 		Vertx vertx = vertx2.get();
 		log.debug("send...");
-		vertx.executeBlocking(future -> {
+		new Thread(() -> {
 			for (int i = 0; i < maxCount; i++) {
-				if (i % 1000 == 0) {
+				if (i % 200 == 0) {
 					log.debug("{}, send message", i);
+					sleep("send:" + i, 10);
 				}
-				vertx.eventBus().send("news", "hello:" + i); // send
+				vertx.eventBus().send(address, "hello:" + i); // send
 			}
-		}, ar -> {
-			if (ar.failed()) {
-				log.warn(ar.cause().toString());
-				fail(ar.cause());
-			}
-		});
-
-//		Failed to send message 
-//		org.redisson.client.RedisTimeoutException: Unable to send command: (SMEMBERS) with params: [{__vertx.subs}:3x2DX/aAu2PthjXwF19xhg] after 3 retry attempts
-//			at org.redisson.command.CommandAsyncService$8.run(CommandAsyncService.java:562)
-//			at io.netty.util.HashedWheelTimer$HashedWheelTimeout.expire(HashedWheelTimer.java:682)
-//			at io.netty.util.HashedWheelTimer$HashedWheelBucket.expireTimeouts(HashedWheelTimer.java:757)
-//			at io.netty.util.HashedWheelTimer$Worker.run(HashedWheelTimer.java:485)
-//			at java.lang.Thread.run(Thread.java:748)
+		}).start();
 
 		log.debug("await...");
-		await(3, TimeUnit.MINUTES); // XXX
+		await(5, TimeUnit.MINUTES); // XXX
 
 		log.debug("close...");
 		Future<Void> f1 = Future.future();
@@ -209,23 +204,32 @@ public class StressTest extends AsyncTestBase {
 
 		VertxOptions options1 = new VertxOptions().setClusterManager(mgr1);
 		options1.getEventBusOptions().setClustered(true).setHost(clusterHost1).setPort(clusterPort1);
+		options1.setInternalBlockingPoolSize(VertxOptions.DEFAULT_INTERNAL_BLOCKING_POOL_SIZE * 2)
+				.setWorkerPoolSize(VertxOptions.DEFAULT_WORKER_POOL_SIZE * 2);
 
 		VertxOptions options2 = new VertxOptions().setClusterManager(mgr2);
 		options2.getEventBusOptions().setClustered(true).setHost(clusterHost2).setPort(clusterPort2);
+		options2.setInternalBlockingPoolSize(VertxOptions.DEFAULT_INTERNAL_BLOCKING_POOL_SIZE * 2)
+				.setWorkerPoolSize(VertxOptions.DEFAULT_WORKER_POOL_SIZE * 2);
 
 		VertxOptions options3 = new VertxOptions().setClusterManager(mgr3);
 		options3.getEventBusOptions().setClustered(true).setHost(clusterHost3).setPort(clusterPort3);
+		options3.setInternalBlockingPoolSize(VertxOptions.DEFAULT_INTERNAL_BLOCKING_POOL_SIZE * 2)
+				.setWorkerPoolSize(VertxOptions.DEFAULT_WORKER_POOL_SIZE * 2);
 
 		VertxOptions options4 = new VertxOptions().setClusterManager(mgr4);
 		options4.getEventBusOptions().setClustered(true).setHost(clusterHost4).setPort(clusterPort4);
+		options4.setInternalBlockingPoolSize(VertxOptions.DEFAULT_INTERNAL_BLOCKING_POOL_SIZE * 2)
+				.setWorkerPoolSize(VertxOptions.DEFAULT_WORKER_POOL_SIZE * 2);
 
 		AtomicReference<Vertx> vertx1 = new AtomicReference<>();
 		AtomicReference<Vertx> vertx2 = new AtomicReference<>();
 		AtomicReference<Vertx> vertx3 = new AtomicReference<>();
 		AtomicReference<Vertx> vertx4 = new AtomicReference<>();
 
-		int maxCount = 47_000; // raise error: 50_000, 49_000; ok: 47_000
+		int maxCount = 51_000; // raise error: 52_000; ok: 51_000
 		AtomicInteger counter = new AtomicInteger(maxCount * 3); // 3 receivers
+		String address = UUID.randomUUID().toString();
 
 		// Receiver
 		Vertx.clusteredVertx(options1, res -> {
@@ -233,7 +237,7 @@ public class StressTest extends AsyncTestBase {
 			assertNotNull(mgr1.getNodeID());
 
 			AtomicInteger localCounter = new AtomicInteger(0);
-			res.result().eventBus().<String>consumer("news", message -> {
+			res.result().eventBus().<String>consumer(address, message -> {
 				assertNotNull(message);
 				if (localCounter.getAndIncrement() % 200 == 0) {
 					log.debug("{}, 1) received message", localCounter);
@@ -255,7 +259,7 @@ public class StressTest extends AsyncTestBase {
 			assertTrue(res.succeeded());
 			assertNotNull(mgr2.getNodeID());
 			AtomicInteger localCounter = new AtomicInteger(0);
-			res.result().eventBus().<String>consumer("news", message -> {
+			res.result().eventBus().<String>consumer(address, message -> {
 				assertNotNull(message);
 				if (localCounter.getAndIncrement() % 200 == 0) {
 					log.debug("{}, 2) received message", localCounter);
@@ -277,7 +281,7 @@ public class StressTest extends AsyncTestBase {
 			assertTrue(res.succeeded());
 			assertNotNull(mgr3.getNodeID());
 			AtomicInteger localCounter = new AtomicInteger(0);
-			res.result().eventBus().<String>consumer("news", message -> {
+			res.result().eventBus().<String>consumer(address, message -> {
 				assertNotNull(message);
 				if (localCounter.getAndIncrement() % 200 == 0) {
 					log.debug("{}, 3) received message", localCounter);
@@ -307,30 +311,18 @@ public class StressTest extends AsyncTestBase {
 
 		Vertx vertx = vertx4.get();
 		log.debug("publish...");
-		vertx.executeBlocking(future -> {
+		new Thread(() -> {
 			for (int i = 0; i < maxCount; i++) {
 				if (i % 200 == 0) {
 					log.debug("{}, publish message", i);
+					sleep("send:" + i, 10);
 				}
-				vertx.eventBus().publish("news", "hello:" + i); // publish
+				vertx.eventBus().publish(address, "hello:" + i); // publish
 			}
-		}, ar -> {
-			if (ar.failed()) {
-				log.warn(ar.cause().toString());
-				fail(ar.cause());
-			}
-		});
-
-//		Failed to send message 
-//		org.redisson.client.RedisTimeoutException: Unable to send command: (SMEMBERS) with params: [{__vertx.subs}:3x2DX/aAu2PthjXwF19xhg] after 3 retry attempts
-//			at org.redisson.command.CommandAsyncService$8.run(CommandAsyncService.java:534)
-//			at io.netty.util.HashedWheelTimer$HashedWheelTimeout.expire(HashedWheelTimer.java:682)
-//			at io.netty.util.HashedWheelTimer$HashedWheelBucket.expireTimeouts(HashedWheelTimer.java:757)
-//			at io.netty.util.HashedWheelTimer$Worker.run(HashedWheelTimer.java:485)
-//			at java.lang.Thread.run(Thread.java:748)
+		}).start();
 
 		log.debug("await...");
-		await(3, TimeUnit.MINUTES); // XXX
+		await(5, TimeUnit.MINUTES); // XXX
 
 		log.debug("close...");
 		Future<Void> f1 = Future.future();
@@ -377,9 +369,13 @@ public class StressTest extends AsyncTestBase {
 
 		VertxOptions options1 = new VertxOptions().setClusterManager(mgr1);
 		options1.getEventBusOptions().setClustered(true).setHost(clusterHost1).setPort(clusterPort1);
+		options1.setInternalBlockingPoolSize(VertxOptions.DEFAULT_INTERNAL_BLOCKING_POOL_SIZE * 2)
+				.setWorkerPoolSize(VertxOptions.DEFAULT_WORKER_POOL_SIZE * 2);
 
 		VertxOptions options2 = new VertxOptions().setClusterManager(mgr2);
 		options2.getEventBusOptions().setClustered(true).setHost(clusterHost2).setPort(clusterPort2);
+		options2.setInternalBlockingPoolSize(VertxOptions.DEFAULT_INTERNAL_BLOCKING_POOL_SIZE * 2)
+				.setWorkerPoolSize(VertxOptions.DEFAULT_WORKER_POOL_SIZE * 2);
 
 		AtomicReference<Vertx> vertx1 = new AtomicReference<>();
 		AtomicReference<Vertx> vertx2 = new AtomicReference<>();
@@ -387,11 +383,13 @@ public class StressTest extends AsyncTestBase {
 		int maxCount = 55_000; // raise error: 60_000, 55_000, 54_480; ok: 54_450
 		AtomicInteger counter = new AtomicInteger(maxCount);
 
+		String address = UUID.randomUUID().toString();
+
 		// Receiver
 		Vertx.clusteredVertx(options1, res -> {
 			assertTrue(res.succeeded());
 			assertNotNull(mgr1.getNodeID());
-			res.result().eventBus().<String>consumer("news", message -> {
+			res.result().eventBus().<String>consumer(address, message -> {
 				if (counter.get() % 1000 == 0) {
 					log.debug("{}, received message", counter);
 				}
@@ -420,14 +418,15 @@ public class StressTest extends AsyncTestBase {
 		AtomicInteger replyCountdown = new AtomicInteger(maxCount);
 		Vertx vertx = vertx2.get();
 		log.debug("send/reply...");
-		vertx.executeBlocking(future -> {
+		new Thread(() -> {
 			for (int i = 0; i < maxCount; i++) {
-				if (i % 1000 == 0) {
+				if (i % 200 == 0) {
 					log.debug("{}, send message", i);
+					sleep("send:" + i, 10);
 				}
-				vertx.eventBus().<String>send("news", "ping:" + i, ar -> {
+				vertx.eventBus().<String>send(address, "ping:" + i, ar -> {
 					if (replyCountdown.get() % 1000 == 0) {
-						log.debug("{}, reply message", counter);
+						log.debug("{}, reply message", replyCountdown);
 					}
 					if (replyCountdown.decrementAndGet() == 0) {
 						log.info("Reply count down completed");
@@ -440,19 +439,10 @@ public class StressTest extends AsyncTestBase {
 					}
 				});
 			}
-		}, ar -> {
-			if (ar.failed()) {
-				log.warn(ar.cause().toString());
-				fail(ar.cause());
-			}
-		});
-
-		// reply failed: (TIMEOUT,-1) Timed out after waiting 30000(ms) for a reply.
-		// address: __vertx.reply.d563a225-a3e8-4296-a8f4-c3b8c3bd1c48, repliedAddress:
-		// news
+		}).start();
 
 		log.debug("await...");
-		await(3, TimeUnit.MINUTES); // XXX
+		await(5, TimeUnit.MINUTES); // XXX
 
 		log.debug("close...");
 		Future<Void> f1 = Future.future();
@@ -492,9 +482,13 @@ public class StressTest extends AsyncTestBase {
 
 		VertxOptions options1 = new VertxOptions().setClusterManager(mgr1);
 		options1.getEventBusOptions().setClustered(true).setHost(clusterHost1).setPort(clusterPort1);
+		options1.setInternalBlockingPoolSize(VertxOptions.DEFAULT_INTERNAL_BLOCKING_POOL_SIZE * 2)
+				.setWorkerPoolSize(VertxOptions.DEFAULT_WORKER_POOL_SIZE * 2);
 
 		VertxOptions options2 = new VertxOptions().setClusterManager(mgr2);
 		options2.getEventBusOptions().setClustered(true).setHost(clusterHost2).setPort(clusterPort2);
+		options2.setInternalBlockingPoolSize(VertxOptions.DEFAULT_INTERNAL_BLOCKING_POOL_SIZE * 2)
+				.setWorkerPoolSize(VertxOptions.DEFAULT_WORKER_POOL_SIZE * 2);
 
 		AtomicReference<Vertx> vertx1 = new AtomicReference<>();
 		AtomicReference<Vertx> vertx2 = new AtomicReference<>();
@@ -529,6 +523,8 @@ public class StressTest extends AsyncTestBase {
 
 		CountDownLatch completedLatch = new CountDownLatch(2);
 
+		String prefix = UUID.randomUUID().toString();
+
 		// Put
 		log.debug("Put...");
 		putVertx.sharedData().<String, String>getClusterWideMap(mapName, ar -> {
@@ -536,14 +532,14 @@ public class StressTest extends AsyncTestBase {
 			AsyncMap<String, String> map = ar.result();
 			map.clear(arv -> {
 				log.debug("Put...clear: {}", arv.succeeded());
-				putVertx.executeBlocking(future -> {
+				new Thread(() -> {
 					log.debug("Put execute...");
 					for (int i = 0; i < maxCount; i++) {
-//						if (i % 1000 == 0) {
-//							log.debug("{}, put", i);
-//							sleep("sleep put:" + i, 1);
-//						}
-						final String key = "news-" + i;
+						if (i % 1000 == 0) {
+							log.debug("{}, put", i);
+							sleep("sleep put:" + i, 10);
+						}
+						final String key = prefix + "-" + i;
 						map.put(key, "hello-" + i, v -> {
 							if (v.failed()) {
 								log.warn("put key: {} failed: {}", key, v.cause().toString());
@@ -558,31 +554,24 @@ public class StressTest extends AsyncTestBase {
 							}
 						});
 					}
-				}, ar2 -> {
-					if (ar2.failed()) {
-						log.warn(ar2.cause().toString());
-						fail(ar2.cause());
-					}
-				});
+				}).start();
 			});
 			log.debug("PUT: {}", map);
 		});
-
-//		put key: news-19638 failed: org.redisson.client.RedisTimeoutException: Unable to send command: (EVAL) with params: [local insertable = false; local v = redis.call('hget', KEYS[1], ARGV[2]); if v == false then inserta..., 8, mymap1, redisson__timeout__set:{mymap1}, redisson__idle__set:{mymap1}, redisson_map_cache_created:{mymap1}, redisson_map_cache_updated:{mymap1}, redisson__map_cache__last_access__set:{mymap1}, redisson_map_cache_removed:{mymap1}, {mymap1}:redisson_options, ...] after 3 retry attempts
 
 		// Get
 		log.debug("Get...");
 		getVertx.sharedData().<String, String>getClusterWideMap(mapName, ar -> {
 			assertTrue(ar.succeeded());
 			AsyncMap<String, String> map = ar.result();
-			getVertx.executeBlocking(future -> {
+			new Thread(() -> {
 				log.debug("Get execute...");
 				for (int i = 0; i < maxCount; i++) {
-//					if (i % 1000 == 0) {
-//						log.debug("{}, get", i);
-//						sleep("sleep get:" + i, 1000);
-//					}
-					final String key = "news-" + i;
+					if (i % 1000 == 0) {
+						log.debug("{}, get", i);
+						sleep("sleep get:" + i, 10);
+					}
+					final String key = prefix + "-" + i;
 					map.get(key, v -> {
 						if (v.failed()) {
 							log.warn("get key: {} failed: {}", key, v.cause().toString());
@@ -598,12 +587,7 @@ public class StressTest extends AsyncTestBase {
 						}
 					});
 				}
-			}, ar2 -> {
-				if (ar2.failed()) {
-					log.warn(ar2.cause().toString());
-					fail(ar2.cause());
-				}
-			});
+			}).start();
 			log.debug("GET: {}", map);
 		});
 
@@ -641,7 +625,6 @@ public class StressTest extends AsyncTestBase {
 		}
 	}
 
-	@SuppressWarnings("unused")
 	private void sleep(String msg, long millis) {
 		// log.debug("Sleep: {}", msg);
 		try {

@@ -16,19 +16,23 @@
 package io.vertx.spi.cluster.redis.impl;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 
+import org.redisson.api.BatchOptions;
+import org.redisson.api.BatchOptions.ExecutionMode;
 import org.redisson.api.RBatch;
 import org.redisson.api.RSetMultimap;
 import org.redisson.api.RedissonClient;
 import org.redisson.client.codec.Codec;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import io.vertx.core.AsyncResult;
 import io.vertx.core.CompositeFuture;
@@ -36,22 +40,22 @@ import io.vertx.core.Context;
 import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
-import io.vertx.core.logging.Logger;
-import io.vertx.core.logging.LoggerFactory;
+//import io.vertx.core.logging.Logger;
+//import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.spi.cluster.AsyncMultiMap;
 import io.vertx.core.spi.cluster.ChoosableIterable;
 
 /**
- * batch.atomic return's value must using Codec to Object. (always return String type)
+ * batch.atomic return's value must using Codec to Object. (always return String
+ * type)
  * 
  * @see org.redisson.RedissonSetMultimapValues
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
 class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 	private static final Logger log = LoggerFactory.getLogger(RedisAsyncMultiMap.class);
-	// private static boolean debug = false;
 
-	protected final ConcurrentMap<K, AtomicReference<RedisChoosableSet<V>>> choosableSetPtr = new ConcurrentHashMap<>();
+	protected final ConcurrentMap<K, ChoosableSet<V>> choosableSetPtr = new ConcurrentHashMap<>();
 	protected final RedissonClient redisson;
 	protected final Vertx vertx;
 	protected final RSetMultimap<K, V> mmap;
@@ -73,8 +77,7 @@ class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 	 */
 	protected RSetMultimap<K, V> createMultimap(RedissonClient redisson, String name, Codec codec) {
 		if (codec == null) {
-			return redisson.getSetMultimap(name);
-			// return redisson.getSetMultimapCache(name);
+			return redisson.getSetMultimap(name); // redisson.getSetMultimapCache(name);
 		} else {
 			return redisson.getSetMultimap(name, codec);
 		}
@@ -98,15 +101,7 @@ class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 			if (e != null) {
 				context.runOnContext(vd -> resultHandler.handle(Future.failedFuture(e)));
 			} else {
-				AtomicReference<RedisChoosableSet<V>> currentRef = getCurrentRef(k);
-				RedisChoosableSet<V> newSet = new RedisChoosableSet<>(v, currentRef);
-				// XXX
-				if (!newSet.isNewSet()) {
-					context.runOnContext(vd -> resultHandler.handle(Future.succeededFuture(currentRef.get())));
-				} else {
-					newSet.moveToCurrent();
-					context.runOnContext(vd -> resultHandler.handle(Future.succeededFuture(newSet)));
-				}
+				context.runOnContext(vd -> resultHandler.handle(Future.succeededFuture(getCurrentRef(k, v))));
 			}
 		});
 
@@ -140,7 +135,7 @@ class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 		});
 	}
 
-	@SuppressWarnings({ "rawtypes" })
+	@SuppressWarnings({ "rawtypes", "deprecation" })
 	private void batchRemoveAllMatching(Predicate<V> p, Handler<AsyncResult<Void>> completionHandler) {
 		mmap.readAllKeySetAsync().whenComplete((keys, e) -> {
 			if (e != null) {
@@ -164,26 +159,6 @@ class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 							if (values.isEmpty()) {
 								keyFuture.complete();
 							} else {
-								// List<Future> valueFutures = new ArrayList<>();
-								// values.forEach(value -> {
-								// if (p.test(value)) { // XXX
-								// log.debug("add remove key={}, value={}", key, value);
-								// Future<Boolean> valueFuture = Future.future();
-								// valueFutures.add(valueFuture);
-								// mmap.removeAsync(key, value).whenComplete((removed, e3) -> {
-								// if (e3 != null) {
-								// valueFuture.fail(e3);
-								// } else {
-								// valueFuture.complete(removed);
-								// }
-								// });
-								// } else {
-								// log.debug("skip remove key={}, value={}", key, value);
-								// }
-								// });
-								// CompositeFuture.join(valueFutures).setHandler(keyFuture); // XXX: join or all ?
-								// ========================
-
 								List<V> deletedList = new ArrayList<>();
 								values.forEach(value -> {
 									if (p.test(value)) { // XXX
@@ -194,11 +169,12 @@ class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 								if (deletedList.isEmpty()) {
 									keyFuture.complete();
 								} else {
-									RBatch batch = redisson.createBatch();
+									RBatch batch = redisson.createBatch(BatchOptions.defaults()
+											.executionMode(ExecutionMode.IN_MEMORY_ATOMIC).skipResult());
 									deletedList.forEach(value -> {
 										mmap.removeAsync(key, value);
 									});
-									batch.atomic().skipResult().executeAsync().whenCompleteAsync((result, e3) -> {
+									batch.executeAsync().whenCompleteAsync((result, e3) -> {
 										if (e != null) {
 											log.warn("key: {}, error: {}", key, e3.toString());
 											keyFuture.fail(e3);
@@ -212,22 +188,42 @@ class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 					});
 				}
 				//
-				CompositeFuture.join(new ArrayList<>(keyFutures.values())).setHandler(
-						ar -> completionHandler.handle(ar.failed() ? Future.failedFuture(ar.cause()) : Future.succeededFuture()));
+				CompositeFuture.join(new ArrayList<>(keyFutures.values())).setHandler(ar -> completionHandler
+						.handle(ar.failed() ? Future.failedFuture(ar.cause()) : Future.succeededFuture()));
 			}
 		});
 	}
 
-	private AtomicReference<RedisChoosableSet<V>> getCurrentRef(K k) {
-		AtomicReference<RedisChoosableSet<V>> currentRef = choosableSetPtr.get(k);
-		if (currentRef == null) {
-			currentRef = new AtomicReference<>();
-			AtomicReference<RedisChoosableSet<V>> previous = choosableSetPtr.putIfAbsent(k, currentRef);
+	private ChoosableSet<V> getCurrentRef(K k, Collection<V> v) {
+		ChoosableSet<V> current = choosableSetPtr.get(k);
+		ChoosableSet<V> newSet = new ChoosableSet<>(v);
+		if (current == null) {
+			ChoosableSet<V> previous = choosableSetPtr.putIfAbsent(k, newSet);
 			if (previous != null) {
-				currentRef = previous;
+				if (!previous.equals(newSet)) {
+					choosableSetPtr.put(k, newSet);
+					log.debug("Using newSet: {}", newSet);
+					current = newSet;
+				} else {
+					log.debug("Using previous: {}", previous);
+					current = previous;
+				}
+			} else {
+				current = newSet;
+				log.debug("Using newSet: {}", newSet);
+			}
+		} else {
+			if (!current.equals(newSet)) {
+				choosableSetPtr.put(k, newSet);
+				log.debug("Using newSet: {}, old: {}", newSet, current);
+				current = newSet;
+			} else {
+				if (current.isEmpty() || newSet.isEmpty()) {
+					log.debug("Using current: {}, newSet: {}", current, newSet);
+				}
 			}
 		}
-		return currentRef;
+		return current;
 	}
 
 	@Override

@@ -15,7 +15,7 @@
  */
 package io.vertx.spi.cluster.redis.impl;
 
-import org.redisson.client.codec.Codec;
+import org.redisson.client.codec.BaseCodec;
 import org.redisson.client.protocol.Decoder;
 import org.redisson.client.protocol.Encoder;
 
@@ -23,7 +23,7 @@ import org.redisson.client.protocol.Encoder;
  *
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
-class KeyValueCodec implements Codec {
+public class KeyValueCodec extends BaseCodec {
 	private final Encoder valueEncoder;
 	private final Decoder<Object> valueDecoder;
 
@@ -32,6 +32,18 @@ class KeyValueCodec implements Codec {
 
 	private final Encoder mapValueEncoder;
 	private final Decoder<Object> mapValueDecoder;
+	
+	/**
+	 * copy
+	 */
+	public KeyValueCodec(ClassLoader classLoader, KeyValueCodec codec) {
+		this.valueEncoder = codec.valueEncoder;
+		this.valueDecoder = codec.valueDecoder;
+		this.mapKeyEncoder = codec.mapKeyEncoder;
+		this.mapKeyDecoder = codec.mapKeyDecoder;
+		this.mapValueEncoder = codec.mapValueEncoder;
+		this.mapValueDecoder = codec.mapValueDecoder;
+	}
 
 	public KeyValueCodec(Encoder valueEncoder, Decoder<Object> valueDecoder, Encoder mapKeyEncoder,
 			Decoder<Object> mapKeyDecoder, Encoder mapValueEncoder, Decoder<Object> mapValueDecoder) {

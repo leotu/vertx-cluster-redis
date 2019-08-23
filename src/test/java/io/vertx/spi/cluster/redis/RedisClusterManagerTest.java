@@ -16,6 +16,7 @@
 
 package io.vertx.spi.cluster.redis;
 
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -44,6 +45,7 @@ import io.vertx.test.core.AsyncTestBase;
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
+@SuppressWarnings("deprecation")
 public class RedisClusterManagerTest extends AsyncTestBase {
 	private static final Logger log = LoggerFactory.getLogger(RedisClusterManagerTest.class);
 //	private static final Logger log;
@@ -73,7 +75,6 @@ public class RedisClusterManagerTest extends AsyncTestBase {
 				.setDatabase(1) //
 				.setPassword("mypwd") //
 				.setTcpNoDelay(true) //
-				.setDnsMonitoring(false) //
 				.setKeepAlive(true) //
 				.setConnectionMinimumIdleSize(5);
 		return Redisson.create(config);
@@ -81,9 +82,10 @@ public class RedisClusterManagerTest extends AsyncTestBase {
 
 	static protected void closeRedissonClient(RedissonClient redisson) {
 		redisson.shutdown(10, 15, TimeUnit.SECONDS);
+		log.debug("after shutdown");
 	}
 
-	// @Test
+	@Test
 	public void test1EventBusP2P() throws Exception {
 		log.debug("BEGIN...");
 
@@ -108,12 +110,14 @@ public class RedisClusterManagerTest extends AsyncTestBase {
 		AtomicReference<Vertx> vertx1 = new AtomicReference<>();
 		AtomicReference<Vertx> vertx2 = new AtomicReference<>();
 
+		String address = UUID.randomUUID().toString();
+
 		// Receiver
 		Vertx.clusteredVertx(options1, res -> {
 			assertTrue(res.succeeded());
 			assertNotNull(mgr1.getNodeID());
 
-			res.result().eventBus().consumer("news", message -> {
+			res.result().eventBus().consumer(address, message -> {
 				assertNotNull(message);
 				log.debug("1) received message.body: {}", message.body());
 				assertTrue(message.body().equals("hello"));
@@ -131,10 +135,12 @@ public class RedisClusterManagerTest extends AsyncTestBase {
 			assertNotNull(mgr2.getNodeID());
 			vertx2.set(res.result());
 			log.debug("2) send...");
-			res.result().eventBus().send("news", "hello"); // send
+			res.result().eventBus().send(address, "hello"); // send
 		});
 
 		assertWaitUntil(() -> vertx2.get() != null);
+
+		sleep("Ready for clusters initialize");
 
 		log.debug("await...");
 		await(); // XXX
@@ -159,7 +165,7 @@ public class RedisClusterManagerTest extends AsyncTestBase {
 		closeRedissonClient(redisson2);
 	}
 
-	// @Test
+//	@Test
 	public void test2EventBusPubSub() throws Exception {
 		log.debug("BEGIN...");
 		String clusterHost1 = IpUtil.getLocalRealIP();
@@ -202,12 +208,13 @@ public class RedisClusterManagerTest extends AsyncTestBase {
 		AtomicReference<Vertx> vertx4 = new AtomicReference<>();
 
 		AtomicInteger counter = new AtomicInteger();
+		String address = UUID.randomUUID().toString();
 
 		// Receiver
 		Vertx.clusteredVertx(options1, res -> {
 			assertTrue(res.succeeded());
 			assertNotNull(mgr1.getNodeID());
-			res.result().eventBus().consumer("news", message -> {
+			res.result().eventBus().consumer(address, message -> {
 				assertNotNull(message);
 				log.debug("1) received message.body: {}", message.body());
 				assertTrue(message.body().equals("hello"));
@@ -222,7 +229,7 @@ public class RedisClusterManagerTest extends AsyncTestBase {
 		Vertx.clusteredVertx(options2, res -> {
 			assertTrue(res.succeeded());
 			assertNotNull(mgr2.getNodeID());
-			res.result().eventBus().consumer("news", message -> {
+			res.result().eventBus().consumer(address, message -> {
 				assertNotNull(message);
 				log.debug("2) received message.body: {}", message.body());
 				assertTrue(message.body().equals("hello"));
@@ -237,7 +244,7 @@ public class RedisClusterManagerTest extends AsyncTestBase {
 		Vertx.clusteredVertx(options3, res -> {
 			assertTrue(res.succeeded());
 			assertNotNull(mgr3.getNodeID());
-			res.result().eventBus().consumer("news", message -> {
+			res.result().eventBus().consumer(address, message -> {
 				assertNotNull(message);
 				log.debug("3) received message.body: {}", message.body());
 				assertTrue(message.body().equals("hello"));
@@ -253,15 +260,16 @@ public class RedisClusterManagerTest extends AsyncTestBase {
 			assertTrue(res.succeeded());
 			assertNotNull(mgr4.getNodeID());
 			vertx4.set(res.result());
-			log.debug("4) publish...");
-			res.result().eventBus().publish("news", "hello"); // publish
 		});
 
 		assertWaitUntil(() -> vertx4.get() != null);
 
-		assertWaitUntil(() -> counter.get() == 3);
+		sleep("Ready for clusters initialize");
 
-		sleep("Before close");
+		log.debug("4) publish...");
+		vertx4.get().eventBus().publish(address, "hello"); // publish
+
+		assertWaitUntil(() -> counter.get() == 3);
 
 		log.debug("close...");
 		Future<Void> f1 = Future.future();
@@ -290,7 +298,7 @@ public class RedisClusterManagerTest extends AsyncTestBase {
 		closeRedissonClient(redisson4);
 	}
 
-	@Test
+//	@Test
 	public void test3EventBusWithReply() throws Exception {
 		log.debug("BEGIN...");
 
@@ -315,11 +323,13 @@ public class RedisClusterManagerTest extends AsyncTestBase {
 		AtomicReference<Vertx> vertx1 = new AtomicReference<>();
 		AtomicReference<Vertx> vertx2 = new AtomicReference<>();
 
+		String address = UUID.randomUUID().toString();
+
 		// Receiver
 		Vertx.clusteredVertx(options1, res -> {
 			assertTrue(res.succeeded());
 			assertNotNull(mgr1.getNodeID());
-			res.result().eventBus().consumer("news", message -> {
+			res.result().eventBus().consumer(address, message -> {
 				assertNotNull(message);
 				log.debug("1) message.body: {}", message.body());
 				assertTrue(message.body().equals("ping"));
@@ -336,7 +346,7 @@ public class RedisClusterManagerTest extends AsyncTestBase {
 			assertNotNull(mgr2.getNodeID());
 			vertx2.set(res.result());
 			log.debug("2) send...");
-			res.result().eventBus().send("news", "ping", ar -> {
+			res.result().eventBus().send(address, "ping", ar -> {
 				log.debug("2) reply status: {}", ar.succeeded());
 				if (ar.succeeded()) {
 					log.debug("2) reply result.body: {}", ar.result().body());
@@ -345,6 +355,8 @@ public class RedisClusterManagerTest extends AsyncTestBase {
 				}
 			});
 		});
+
+		sleep("Ready for clusters initialize");
 
 		log.debug("await...");
 		await(); // XXX
@@ -369,7 +381,7 @@ public class RedisClusterManagerTest extends AsyncTestBase {
 		closeRedissonClient(redisson2);
 	}
 
-	// @Test
+//	@Test
 	public void test4SharedData() throws Exception {
 		log.debug("BEGIN...");
 
@@ -394,6 +406,7 @@ public class RedisClusterManagerTest extends AsyncTestBase {
 		AtomicReference<Vertx> vertx1 = new AtomicReference<>();
 		AtomicReference<Vertx> vertx2 = new AtomicReference<>();
 
+		String key = UUID.randomUUID().toString();
 		String mapName = "mymap1";
 
 		// Put
@@ -401,7 +414,7 @@ public class RedisClusterManagerTest extends AsyncTestBase {
 			assertTrue(res.succeeded());
 			assertNotNull(mgr1.getNodeID());
 			res.result().sharedData().getClusterWideMap(mapName, ar -> {
-				ar.result().put("news", "hello", v -> {
+				ar.result().put(key, "hello", v -> {
 					log.debug("1) put succeeded: {}", v.succeeded());
 				});
 			});
@@ -416,13 +429,15 @@ public class RedisClusterManagerTest extends AsyncTestBase {
 			assertNotNull(mgr2.getNodeID());
 			vertx2.set(res.result());
 			res.result().sharedData().getClusterWideMap(mapName, ar -> {
-				ar.result().get("news", r -> {
+				ar.result().get(key, r -> {
 					log.debug("2) get value: {}", r.result());
 					assertEquals("hello", r.result());
 					testComplete(); // XXX
 				});
 			});
 		});
+
+		sleep("Ready for clusters initialize");
 
 		log.debug("await...");
 		await(); // XXX

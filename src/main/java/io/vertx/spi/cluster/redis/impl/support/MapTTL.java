@@ -13,7 +13,7 @@
  *
  * You may elect to redistribute this code under either of these licenses.
  */
-package io.vertx.spi.cluster.redis.impl;
+package io.vertx.spi.cluster.redis.impl.support;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -39,10 +39,12 @@ import io.vertx.core.Context;
 import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
-import io.vertx.core.logging.Logger;
-import io.vertx.core.logging.LoggerFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+//import io.vertx.core.logging.Logger;
+//import io.vertx.core.logging.LoggerFactory;
 import io.vertx.spi.cluster.redis.ExpirableAsync;
-import io.vertx.spi.cluster.redis.impl.NonPublicAPI.Reflection;
+import io.vertx.spi.cluster.redis.impl.support.NonPublicAPI.Reflection;
 
 /**
  *

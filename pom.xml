@@ -28,8 +28,8 @@
 		<!-- <compile.optimize>true</compile.optimize> -->
 		<resources.encoding>ISO8859-1</resources.encoding>
 
-		<stack.version>3.7.1</stack.version>
-		<redisson.version>3.6.1</redisson.version>
+		<stack.version>3.8.1</stack.version> <!-- 3.7.1 -->
+		<redisson.version>3.11.2</redisson.version> <!-- 3.6.1 -->
 		<junit.version>4.12</junit.version>
 		<logback.version>1.2.3</logback.version>
 	</properties>

@@ -16,47 +16,45 @@
 package io.vertx.spi.cluster.redis.impl;
 
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 import org.redisson.api.RMapCache;
 import org.redisson.api.RedissonClient;
+import org.redisson.api.map.event.EntryCreatedListener;
+import org.redisson.api.map.event.EntryEvent;
+import org.redisson.api.map.event.EntryExpiredListener;
+import org.redisson.api.map.event.EntryRemovedListener;
+import org.redisson.api.map.event.EntryUpdatedListener;
 import org.redisson.client.codec.Codec;
 import org.redisson.client.codec.StringCodec;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import io.vertx.core.Vertx;
-//import org.slf4j.Logger;
-//import org.slf4j.LoggerFactory;
-import io.vertx.core.logging.Logger;
-import io.vertx.core.logging.LoggerFactory;
+//import io.vertx.core.logging.Logger;
+//import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.spi.cluster.ClusterManager;
 import io.vertx.core.spi.cluster.NodeListener;
 import io.vertx.spi.cluster.redis.Factory.NodeAttachListener;
 
 /**
- * CLUSTER_MAP_NAME = "__vertx.haInfo"
  * 
  * @see io.vertx.core.impl.HAManager
- * @see io.vertx.core.json.JsonObject#encode
- * 
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
 class RedisMapHaInfo extends RedisMap<String, String> implements NodeAttachListener {
 	private static final Logger log = LoggerFactory.getLogger(RedisMapHaInfo.class);
 
-	private final int timeToLiveSeconds;
-
 	private final ClusterManager clusterManager;
-	private final HaInfoTTLMonitor ttlMonitor;
+	private NodeListener nodeListener;
+	private int removedListeneId;
+	private int expiredListenerId;
+	private int createdListenerId;
+	private int updatedListenerId;
 
-	public RedisMapHaInfo(Vertx vertx, ClusterManager clusterManager, RedissonClient redisson, String name,
-			int timeToLiveSeconds, int refreshIntervalSeconds) {
+	public RedisMapHaInfo(Vertx vertx, ClusterManager clusterManager, RedissonClient redisson, String name) {
 		super(vertx, redisson, name, null);
 		this.clusterManager = clusterManager;
-		this.timeToLiveSeconds = timeToLiveSeconds;
-		this.ttlMonitor = new HaInfoTTLMonitor(vertx, this.clusterManager, redisson, this, this.name,
-				refreshIntervalSeconds);
-		log.debug("nodeID: {}, timeToLiveSeconds: {}, refreshIntervalSeconds: {}", clusterManager.getNodeID(),
-				timeToLiveSeconds, refreshIntervalSeconds);
+		this.attachListener();
 	}
 
 	/**
@@ -64,25 +62,37 @@ class RedisMapHaInfo extends RedisMap<String, String> implements NodeAttachListe
 	 */
 	@Override
 	protected RMapCache<String, String> createMap(RedissonClient redisson, String name, Codec codec) {
-		RMapCache<String, String> mapAsync = redisson.getMapCache(name, new StringCodec());
-		return mapAsync;
+		return redisson.getMapCache(name, new StringCodec());
 	}
 
 	protected RMapCache<String, String> getMapAsync() {
-		return (RMapCache<String, String>) map;
-	}
-
-	protected int getTimeToLiveSeconds() {
-		return timeToLiveSeconds;
+		return (RMapCache<String, String>) super.map;
 	}
 
 	@Override
 	public void attachListener(NodeListener nodeListener) {
-		ttlMonitor.attachListener(nodeListener);
+		log.debug("...");
+		this.nodeListener = nodeListener;
 	}
 
-	public void close() {
-		ttlMonitor.stop();
+	public void detachListener() {
+		RMapCache<String, String> mapAsync = getMapAsync();
+		if (removedListeneId != 0) {
+			mapAsync.removeListener(removedListeneId);
+			removedListeneId = 0;
+		}
+		if (expiredListenerId != 0) {
+			mapAsync.removeListener(expiredListenerId);
+			expiredListenerId = 0;
+		}
+		if (createdListenerId != 0) {
+			mapAsync.removeListener(createdListenerId);
+			createdListenerId = 0;
+		}
+		if (updatedListenerId != 0) {
+			mapAsync.removeListener(updatedListenerId);
+			updatedListenerId = 0;
+		}
 	}
 
 	@Override
@@ -91,18 +101,66 @@ class RedisMapHaInfo extends RedisMap<String, String> implements NodeAttachListe
 	}
 
 	/**
-	 * @return previous
+	 * Included self node ID notify
+	 * 
+	 * @see io.vertx.core.impl.HAManager#nodeAdded
+	 * @see io.vertx.core.impl.HAManager#nodeLeft
 	 */
-	@Override
-	public String put(String key, String value) {
-		try {
-			return timeToLiveSeconds > 0 ? getMapAsync().put(key, value, timeToLiveSeconds, TimeUnit.SECONDS)
-					: super.put(key, value);
-		} catch (Exception ignore) {
-			String previous = super.put(key, value);
-			log.warn("retry without TTL: key: {}, value: {}, previous: {}, timeToLiveSeconds: {}, error: {}", key, value,
-					previous, timeToLiveSeconds, ignore.toString());
-			return previous;
+	private void attachListener() {
+		log.info("### current nodeID: {}, nodeListener: {}", clusterManager.getNodeID(), nodeListener);
+		RMapCache<String, String> mapAsync = getMapAsync();
+		if (removedListeneId == 0) {
+			removedListeneId = mapAsync.addListener(new EntryRemovedListener<String, String>() {
+				@Override
+				public void onRemoved(EntryEvent<String, String> event) {
+					String nodeId = event.getKey();
+					log.info("### onRemoved: {}", nodeId);
+					if (nodeListener != null) {
+						nodeListener.nodeLeft(nodeId);
+					}
+				}
+			});
+		}
+
+		if (expiredListenerId == 0) {
+			expiredListenerId = mapAsync.addListener(new EntryExpiredListener<String, String>() {
+				@Override
+				public void onExpired(EntryEvent<String, String> event) {
+					String nodeId = event.getKey();
+					log.info("### onExpired: {}", nodeId);
+					if (nodeListener != null) {
+						nodeListener.nodeLeft(nodeId);
+					}
+				}
+			});
+		}
+
+		if (createdListenerId == 0) {
+			createdListenerId = mapAsync.addListener(new EntryCreatedListener<String, String>() {
+				@Override
+				public void onCreated(EntryEvent<String, String> event) {
+					String nodeId = event.getKey();
+					log.info("### onCreated: {}", nodeId);
+					if (nodeListener != null) {
+						nodeListener.nodeAdded(nodeId);
+					}
+				}
+			});
+		}
+
+		if (updatedListenerId == 0) {
+			updatedListenerId = mapAsync.addListener(new EntryUpdatedListener<String, String>() {
+				@Override
+				public void onUpdated(EntryEvent<String, String> event) {
+					String nodeId = event.getKey();
+					log.info("### onUpdated: {}", nodeId);
+					if (clusterManager.getNodeID().equals(nodeId)) { // only work on self's node
+						log.info("### onUpdated is self: {}", nodeId);
+					} else {
+						nodeListener.nodeAdded(nodeId);
+					}
+				}
+			});
 		}
 	}
 }

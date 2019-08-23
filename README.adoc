@@ -1,11 +1,11 @@
-= Redis Cluster Manager (deprecated)
+= Redis Cluster Manager
 
 This is a cluster manager implementation for Vert.x that uses https://github.com/redisson/redisson/[Redisson].
 
 https://github.com/leotu/vertx-cluster-redis
 
 - Need to refactoring the code
-- Upgrade to Vert.x 3.7.1
+- Upgrade to Vert.x 3.8.1
 
 == Test docker
  
