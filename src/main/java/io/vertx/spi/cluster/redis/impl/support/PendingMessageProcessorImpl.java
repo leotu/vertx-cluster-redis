@@ -15,6 +15,162 @@
  */
 package io.vertx.spi.cluster.redis.impl.support;
 
+<<<<<<< HEAD
+import java.lang.reflect.InvocationTargetException;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+//import io.vertx.core.logging.Logger;
+//import io.vertx.core.logging.LoggerFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import io.vertx.core.AsyncResult;
+import io.vertx.core.Future;
+import io.vertx.core.Handler;
+import io.vertx.core.Vertx;
+import io.vertx.core.eventbus.DeliveryContext;
+import io.vertx.core.eventbus.Message;
+import io.vertx.core.eventbus.impl.MessageImpl;
+import io.vertx.core.eventbus.impl.clustered.ClusterNodeInfo;
+import io.vertx.core.eventbus.impl.clustered.ClusteredEventBus;
+import io.vertx.core.eventbus.impl.clustered.ClusteredMessage;
+import io.vertx.core.spi.cluster.AsyncMultiMap;
+import io.vertx.core.spi.cluster.ClusterManager;
+import io.vertx.spi.cluster.redis.FactorySupport.PendingMessageProcessor;
+
+/**
+ * Retryable to choose another server ID
+ * 
+ * @see io.vertx.core.eventbus.impl.clustered.ConnectionHolder#close
+ * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
+ */
+class PendingMessageProcessorImpl implements PendingMessageProcessor {
+	private static final Logger log = LoggerFactory.getLogger(PendingMessageProcessorImpl.class);
+
+	private static final String PING_ADDRESS = "__vertx_ping";
+	private static final String GENERATED_REPLY_ADDRESS_PREFIX = "__vertx.reply.";
+
+	private final String retryHeaderKey = "__retry_outbound_interceptor__";
+	private final String retryCounterHeaderKey = retryHeaderKey + "counter";
+
+	private Vertx vertx;
+	@SuppressWarnings("unused")
+	private ClusterManager clusterManager;
+	private ClusteredEventBus eventBus;
+	@SuppressWarnings("unused")
+	private AsyncMultiMap<String, ClusterNodeInfo> subs;
+
+	public PendingMessageProcessorImpl(Vertx vertx, ClusterManager clusterManager,
+			AsyncMultiMap<String, ClusterNodeInfo> subs) {
+		this.vertx = vertx;
+		this.clusterManager = clusterManager;
+		this.eventBus = (ClusteredEventBus) vertx.eventBus();
+		this.subs = subs;
+	}
+
+	@Override
+	public void run() {
+		log.debug("...");
+		eventBus.addOutboundInterceptor(ctx -> { // sendInterceptors (sendReply)
+			Message<?> message = ctx.message();
+			if (ctx.send() && message instanceof ClusteredMessage) {
+				ClusteredMessage<?, ?> msg = (ClusteredMessage<?, ?>) message;
+				boolean fromRetry = msg.headers().get(retryHeaderKey) != null;
+				if (!PING_ADDRESS.equals(msg.address()) && !msg.address().startsWith(GENERATED_REPLY_ADDRESS_PREFIX) //
+						&& !(msg.writeHandler() instanceof PendingWriteHandler) && !fromRetry) {
+					log.debug("address: {}, fromRetry: {}", msg.address(), fromRetry);
+					PendingWriteHandler pendingWriteHandler = new PendingWriteHandler(vertx, ctx, msg);
+					NonPublicAPI.Reflection.setField(msg, MessageImpl.class, "writeHandler", pendingWriteHandler);
+				}
+				ctx.next();
+			} else {
+				// log.debug("###<< BEFORE: OutboundInterceptor ctx: {}", ctx.message().body());
+				ctx.next();
+				// log.debug("###<< AFTER: OutboundInterceptor ctx: {}", ctx.message().body());
+			}
+		});
+	}
+
+	public class PendingWriteHandler implements Handler<AsyncResult<Void>> {
+
+		private final Vertx vertx;
+		private final DeliveryContext<?> ctx;
+		private final ClusteredMessage<?, ?> msg;
+		private final Handler<AsyncResult<Void>> writeHandler;
+
+		public PendingWriteHandler(Vertx vertx, DeliveryContext<?> ctx, ClusteredMessage<?, ?> msg) {
+			this.vertx = vertx;
+			this.ctx = ctx;
+			this.msg = msg;
+			this.writeHandler = msg.writeHandler();
+		}
+
+		@Override
+		public void handle(AsyncResult<Void> ar) {
+			AtomicBoolean retriable = new AtomicBoolean(false);
+			log.debug("writeHandler: {}", writeHandler);
+			if (writeHandler == null) {
+				if (ar.failed()) {
+					if (isConnectionRefusedErr(ar.cause())) {
+						log.warn("<< OutboundInterceptor msg.address: " + msg.address() + ", result failed!",
+								ar.cause());
+						retriable.set(true);
+						action(vertx, msg);
+//						ctx.next();
+					} else {
+//						ctx.next();
+					}
+				} else {
+//					ctx.next();
+				}
+			} else {
+				if (ar.succeeded()) {
+					writeHandler.handle(Future.succeededFuture(ar.result()));
+//					ctx.next();
+				} else {
+					if (isConnectionRefusedErr(ar.cause())) {
+						log.warn("<< OutboundInterceptor msg.address: {}, result failed: {}", msg.address(),
+								ar.cause().toString());
+						writeHandler.handle(Future.failedFuture(ar.cause()));
+						retriable.set(true);
+						action(vertx, msg);
+//						ctx.next();
+					} else {
+//						ctx.next();
+					}
+				}
+			}
+		}
+	}
+
+	private void action(Vertx vertx, ClusteredMessage<?, ?> msg) {
+		msg.headers().set(retryHeaderKey, msg.address());
+
+		int fromRetryCounter = 0;
+		try {
+			fromRetryCounter = Integer.parseInt(msg.headers().get(retryCounterHeaderKey));
+		} catch (NumberFormatException e) {
+			// ignored
+		}
+		log.debug("<< OutboundInterceptor msg.address: {}, fromRetryCounter: {}", msg.address(), fromRetryCounter);
+		msg.headers().set(retryCounterHeaderKey, String.valueOf(fromRetryCounter + 1));
+	}
+
+	private boolean isConnectionRefusedErr(Throwable e) {
+		boolean connectionRefusedErr = false;
+		while (e != null) {
+			if (e instanceof InvocationTargetException) {
+				e = ((InvocationTargetException) e).getCause();
+			}
+			String errMsg = e.getMessage();
+			if (errMsg != null && errMsg.startsWith("Connection refused:")) { // Connection refused: /192.168.99.1:18081
+				connectionRefusedErr = true;
+			}
+			e = e.getCause();
+		}
+		return connectionRefusedErr;
+	}
+=======
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
@@ -274,4 +430,5 @@ class PendingMessageProcessorImpl implements PendingMessageProcessor {
 		return fu;
 	}
 
+>>>>>>> branch 'master' of https://github.com/leotu/vertx-cluster-redis.git
 }

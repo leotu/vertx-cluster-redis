@@ -113,7 +113,11 @@ public class RetriableSenderTest extends AsyncTestBase {
 					log.debug("{}, send message", i);
 					sleep("send: " + i, 20);
 				}
+<<<<<<< HEAD
+				sleep("send:" + i, 1000);
+=======
 				//sleep("send:" + i, 1);
+>>>>>>> branch 'master' of https://github.com/leotu/vertx-cluster-redis.git
 				vertx.eventBus().<String>send("Retriable", "hello:" + i, ar -> {
 					if (replyCountdown.get() % 1000 == 0) {
 						log.debug("{}, reply message", replyCountdown);

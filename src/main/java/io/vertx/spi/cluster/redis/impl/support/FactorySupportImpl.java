@@ -15,6 +15,34 @@
  */
 package io.vertx.spi.cluster.redis.impl.support;
 
+<<<<<<< HEAD
+//import org.slf4j.Logger;
+//import org.slf4j.LoggerFactory;
+
+import io.vertx.core.Vertx;
+import io.vertx.core.eventbus.impl.clustered.ClusterNodeInfo;
+import io.vertx.core.spi.cluster.AsyncMultiMap;
+import io.vertx.core.spi.cluster.ClusterManager;
+import io.vertx.spi.cluster.redis.FactorySupport;
+
+/**
+ * 
+ * @see org.redisson.api.RLocalCachedMap
+ * @see org.redisson.Redisson#getLocalCachedMap
+ * @see org.redisson.api.LocalCachedMapOptions
+ * @see io.vertx.core.eventbus.impl.clustered.ConnectionHolder
+ * @see io.vertx.core.eventbus.impl.clustered.ClusteredEventBus
+ * 
+ * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
+ */
+public class FactorySupportImpl implements FactorySupport {
+	//private static final Logger log = LoggerFactory.getLogger(FactorySupportImpl.class);
+
+	@Override
+	public PendingMessageProcessor createPendingMessageProcessor(Vertx vertx, ClusterManager clusterManager,
+			AsyncMultiMap<String, ClusterNodeInfo> subs) {
+		return new PendingMessageProcessorImpl(vertx, clusterManager, subs);
+=======
 import java.lang.reflect.InvocationTargetException;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -314,6 +342,7 @@ public class FactorySupportImpl implements FactorySupport {
 //		at java.lang.Thread.run(Thread.java:748)
 //	Caused by: java.net.ConnectException: Connection refused
 		});
+>>>>>>> branch 'master' of https://github.com/leotu/vertx-cluster-redis.git
 	}
 
 }

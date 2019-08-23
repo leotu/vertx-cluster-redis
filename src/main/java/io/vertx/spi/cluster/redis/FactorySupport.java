@@ -31,7 +31,11 @@ public interface FactorySupport {
 			AsyncMultiMap<String, ClusterNodeInfo> subs);
 
 	interface PendingMessageProcessor {
+<<<<<<< HEAD
+		void run();
+=======
 		void run(Object serverID, Object connHolder);
+>>>>>>> branch 'master' of https://github.com/leotu/vertx-cluster-redis.git
 	}
 
 	static public FactorySupport createDefaultFactorySupport() {

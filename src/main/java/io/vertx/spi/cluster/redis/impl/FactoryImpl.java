@@ -76,7 +76,11 @@ public class FactoryImpl implements Factory {
 	public AsyncMultiMap<String, ClusterNodeInfo> createAsyncMultiMapSubs(Vertx vertx, ClusterManager clusterManager,
 			RedissonClient redisson, String name) {
 		AsyncMultiMap<String, ClusterNodeInfo> subs = new RedisAsyncMultiMapSubs(vertx, clusterManager, redisson, name);
+<<<<<<< HEAD
+		FactorySupport.createDefaultFactorySupport().createPendingMessageProcessor(vertx, clusterManager, subs).run();
+=======
 		FactorySupport.createDefaultFactorySupport().createPendingMessageProcessor(vertx, clusterManager, subs);
+>>>>>>> branch 'master' of https://github.com/leotu/vertx-cluster-redis.git
 		return subs;
 	}
 
