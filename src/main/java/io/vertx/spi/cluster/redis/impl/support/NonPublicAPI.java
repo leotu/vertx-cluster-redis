@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 The original author or authors
+ * Copyright (c) 2019 The original author or authors
  * ------------------------------------------------------
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -106,10 +106,6 @@ class NonPublicAPI {
 			 * ConnectionHolder's pending
 			 */
 			public static Queue<ClusteredMessage<?, ?>> pending(Object connHolder) {
-//				if (connHolder instanceof ConnectionHolderExt) {
-//					return Reflection.getField(connHolder, connHolder.getClass().getSuperclass(), "pending");
-//				}
-				
 				if (!connHolder.getClass().getName().equals("io.vertx.core.eventbus.impl.clustered.ConnectionHolder")) {
 					throw new IllegalArgumentException(
 							"Only support type: io.vertx.core.eventbus.impl.clustered.ConnectionHolder, but parameter's type is: "
@@ -122,10 +118,6 @@ class NonPublicAPI {
 			 * ConnectionHolder's serverID
 			 */
 			public static ServerID serverID(Object connHolder) {
-//				if (connHolder instanceof ConnectionHolderExt) {
-//					return Reflection.getField(connHolder, connHolder.getClass().getSuperclass(), "serverID");
-//				}
-				
 				if (!connHolder.getClass().getName().equals("io.vertx.core.eventbus.impl.clustered.ConnectionHolder")) {
 					throw new IllegalArgumentException(
 							"Only support type: io.vertx.core.eventbus.impl.clustered.ConnectionHolder, but parameter's type is: "

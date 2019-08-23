@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 The original author or authors
+ * Copyright (c) 2019 The original author or authors
  * ------------------------------------------------------
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -46,10 +46,10 @@ import io.vertx.core.spi.cluster.AsyncMultiMap;
 import io.vertx.core.spi.cluster.ChoosableIterable;
 
 /**
- * batch.atomic return's value must using Codec to Object. (always return String
- * type)
+ * batch.atomic return's value must using Codec to Object. (always return String type)
  * 
  * @see org.redisson.RedissonSetMultimapValues
+ * 
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
 class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
@@ -202,20 +202,20 @@ class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
 			if (previous != null) {
 				if (!previous.equals(newSet)) {
 					choosableSetPtr.put(k, newSet);
-					log.debug("Using newSet: {}", newSet);
+					// log.debug("Using newSet: {}", newSet);
 					current = newSet;
 				} else {
-					log.debug("Using previous: {}", previous);
+					// log.debug("Using previous: {}", previous);
 					current = previous;
 				}
 			} else {
 				current = newSet;
-				log.debug("Using newSet: {}", newSet);
+				// log.debug("Using newSet: {}", newSet);
 			}
 		} else {
 			if (!current.equals(newSet)) {
 				choosableSetPtr.put(k, newSet);
-				log.debug("Using newSet: {}, old: {}", newSet, current);
+				// log.debug("Using newSet: {}, old: {}", newSet, current);
 				current = newSet;
 			} else {
 				if (current.isEmpty() || newSet.isEmpty()) {

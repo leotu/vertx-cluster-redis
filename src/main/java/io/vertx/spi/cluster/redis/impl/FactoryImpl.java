@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 The original author or authors
+ * Copyright (c) 2019 The original author or authors
  * ------------------------------------------------------
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -37,18 +37,12 @@ import io.vertx.spi.cluster.redis.FactorySupport;
  * @see org.redisson.api.RLocalCachedMap
  * @see org.redisson.Redisson#getLocalCachedMap
  * @see org.redisson.api.LocalCachedMapOptions
+ * 
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
 public class FactoryImpl implements Factory {
 	private static final Logger log = LoggerFactory.getLogger(FactoryImpl.class);
-//
-//	public static final String CLUSTER_MAP_NAME = NonPublicAPI.HA_CLUSTER_MAP_NAME;
-//	public static final String SUBS_MAP_NAME = NonPublicAPI.EB_SUBS_MAP_NAME;
-//
-//
-//	private static final String PING_ADDRESS = "__vertx_ping";
-//	private static final String GENERATED_REPLY_ADDRESS_PREFIX = "__vertx.reply.";
-//
+
 	private final SpecifyCodec specify = new SpecifyCodec();
 
 	@Override
@@ -76,7 +70,7 @@ public class FactoryImpl implements Factory {
 	public AsyncMultiMap<String, ClusterNodeInfo> createAsyncMultiMapSubs(Vertx vertx, ClusterManager clusterManager,
 			RedissonClient redisson, String name) {
 		AsyncMultiMap<String, ClusterNodeInfo> subs = new RedisAsyncMultiMapSubs(vertx, clusterManager, redisson, name);
-		FactorySupport.createDefaultFactorySupport().createPendingMessageProcessor(vertx, clusterManager, subs);
+		FactorySupport.createDefaultFactorySupport().createPendingMessageProcessor(vertx, clusterManager, subs).run();
 		return subs;
 	}
 

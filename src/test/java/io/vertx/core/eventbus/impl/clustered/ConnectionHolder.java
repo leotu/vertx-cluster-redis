@@ -66,6 +66,7 @@ class ConnectionHolder {
   }
 
   synchronized void connect() {
+	  log.debug("...");
     if (connected) {
       throw new IllegalStateException("Already connected");
     }
@@ -120,8 +121,13 @@ class ConnectionHolder {
         	
 //        	ClusteredMessage cmsg = (ClusteredMessage)msg;
         
+        	String retryHeaderKey = "__retry_outbound_interceptor__";
+    		String retryCounterHeaderKey = retryHeaderKey + "counter";
+    		boolean fromRetry = msg.headers().get(retryHeaderKey) != null;
+    		String retryCounter = msg.headers().get(retryCounterHeaderKey);
+    		
           Handler<AsyncResult<Void>> handler = msg.writeHandler();
-      	  log.warn("### failure msg handler for server " + serverID + ", msg: " + msg + ", msg.address:" + msg.address() + ", msg.replyAddress:" + msg.replyAddress()  + ", msg.body:" + msg.body() + ", handler: "  + handler + ", cause:" + cause.toString() + ", __OutboundInterceptor__=" + msg.headers().get("__OutboundInterceptor__"));
+      	  log.warn("### failure msg handler for server " + serverID + ", msg: " + msg + ", msg.address:" + msg.address() + ", msg.replyAddress:" + msg.replyAddress()  + ", msg.body:" + msg.body() + ", handler: "  + handler + ", cause:" + cause.toString() + ", fromRetry=" + fromRetry + ", retryCounter=" + retryCounter);
           if (handler != null) {
           	//  log.warn("### failure msg handler for server " + serverID + ", msg: " + msg + ", msg.body:" + msg.body() + ", handler: "  + handler + ", cause:" + cause.toString());
         	  

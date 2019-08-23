@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 The original author or authors
+ * Copyright (c) 2019 The original author or authors
  * ------------------------------------------------------
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -39,6 +39,7 @@ import io.vertx.spi.cluster.redis.Factory.NodeAttachListener;
 /**
  * 
  * @see io.vertx.core.impl.HAManager
+ * 
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
 class RedisMapHaInfo extends RedisMap<String, String> implements NodeAttachListener {
@@ -114,7 +115,7 @@ class RedisMapHaInfo extends RedisMap<String, String> implements NodeAttachListe
 				@Override
 				public void onRemoved(EntryEvent<String, String> event) {
 					String nodeId = event.getKey();
-					log.info("### onRemoved: {}", nodeId);
+					log.info("### self: {}, onRemoved: {}", clusterManager.getNodeID(), nodeId);
 					if (nodeListener != null) {
 						nodeListener.nodeLeft(nodeId);
 					}
@@ -127,7 +128,7 @@ class RedisMapHaInfo extends RedisMap<String, String> implements NodeAttachListe
 				@Override
 				public void onExpired(EntryEvent<String, String> event) {
 					String nodeId = event.getKey();
-					log.info("### onExpired: {}", nodeId);
+					log.info("### self: {}, onExpired: {}", clusterManager.getNodeID(), nodeId);
 					if (nodeListener != null) {
 						nodeListener.nodeLeft(nodeId);
 					}
@@ -140,7 +141,7 @@ class RedisMapHaInfo extends RedisMap<String, String> implements NodeAttachListe
 				@Override
 				public void onCreated(EntryEvent<String, String> event) {
 					String nodeId = event.getKey();
-					log.info("### onCreated: {}", nodeId);
+					log.info("### self: {}, onCreated: {}", clusterManager.getNodeID(), nodeId);
 					if (nodeListener != null) {
 						nodeListener.nodeAdded(nodeId);
 					}
@@ -153,9 +154,9 @@ class RedisMapHaInfo extends RedisMap<String, String> implements NodeAttachListe
 				@Override
 				public void onUpdated(EntryEvent<String, String> event) {
 					String nodeId = event.getKey();
-					log.info("### onUpdated: {}", nodeId);
+					log.info("### self: {}, onUpdated: {}", clusterManager.getNodeID(), nodeId);
 					if (clusterManager.getNodeID().equals(nodeId)) { // only work on self's node
-						log.info("### onUpdated is self: {}", nodeId);
+						log.info("### Skip onUpdated is self: {}", nodeId);
 					} else {
 						nodeListener.nodeAdded(nodeId);
 					}

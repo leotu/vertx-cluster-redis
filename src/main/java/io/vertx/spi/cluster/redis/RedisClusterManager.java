@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 The original author or authors
+ * Copyright (c) 2019 The original author or authors
  * ------------------------------------------------------
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -51,6 +51,7 @@ import io.vertx.spi.cluster.redis.Factory.NodeAttachListener;
  * https://github.com/redisson/redisson/wiki/11.-Redis-commands-mapping
  * 
  * @see io.vertx.core.impl.VertxFactoryImpl#clusteredVertx
+ * 
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
 public class RedisClusterManager implements ClusterManager {
@@ -184,7 +185,11 @@ public class RedisClusterManager implements ClusterManager {
 	@Override
 	public List<String> getNodes() {
 		List<String> nodes = haInfo.keySet().stream().map(e -> e.toString()).collect(Collectors.toList());
-		log.debug("nodes.size: {}, nodes: {}", nodes.size(), nodes);
+		if (nodes.isEmpty()) {
+			log.info("(nodes.isEmpty()), nodeId: {}", nodeId);
+		} else {
+			log.debug("nodeId: {}, nodes.size: {}, nodes: {}", nodeId, nodes.size(), nodes);
+		}
 		return nodes;
 	}
 

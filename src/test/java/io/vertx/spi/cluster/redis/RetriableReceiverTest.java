@@ -97,13 +97,14 @@ public class RetriableReceiverTest extends AsyncTestBase {
 		AtomicReference<Vertx> vertx1 = new AtomicReference<>();
 
 		AtomicInteger counter = new AtomicInteger(0);
-
+		String address = "Retriable";
+		
 		// Receiver
 		Vertx.clusteredVertx(options1, res -> {
 			assertTrue(res.succeeded());
 			assertNotNull(mgr1.getNodeID());
 
-			res.result().eventBus().<String>consumer("Retriable", message -> {
+			res.result().eventBus().<String>consumer(address, message -> {
 				assertNotNull(message);
 				if (counter.getAndIncrement() % 100 == 0) {
 					log.debug("{}, received message, clusterPort1: {}" , counter, clusterPort1);

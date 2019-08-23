@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 The original author or authors
+ * Copyright (c) 2019 The original author or authors
  * ------------------------------------------------------
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -40,8 +40,7 @@ import io.vertx.core.shareddata.AsyncMap;
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
 class RedisAsyncMap<K, V> implements AsyncMap<K, V> { // extends MapTTL<K, V>
-	// private static final Logger log =
-	// LoggerFactory.getLogger(RedisAsyncMap.class);
+	// private static final Logger log = LoggerFactory.getLogger(RedisAsyncMap.class);
 
 	protected final RedisStrictCommand<Long> ZSCORE_LONG = new RedisStrictCommand<Long>("ZSCORE",
 			new LongReplayConvertor()); // RedisCommands.ZSCORE
