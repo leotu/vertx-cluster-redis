@@ -107,7 +107,7 @@ public class RetriableSenderTest extends AsyncTestBase {
 		AtomicInteger replyCountdown = new AtomicInteger(maxCount);
 		Vertx vertx = vertx2.get();
 		String address = "Retriable";
-
+		
 		log.debug("send...");
 		new Thread( () -> {
 			for (int i = 0; i < maxCount; i++) {

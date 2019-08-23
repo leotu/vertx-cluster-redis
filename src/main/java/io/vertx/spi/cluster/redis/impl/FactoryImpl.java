@@ -42,7 +42,7 @@ import io.vertx.spi.cluster.redis.FactorySupport;
  */
 public class FactoryImpl implements Factory {
 	private static final Logger log = LoggerFactory.getLogger(FactoryImpl.class);
-
+//
 	private final SpecifyCodec specify = new SpecifyCodec();
 
 	@Override

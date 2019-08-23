@@ -16,6 +16,7 @@
 package io.vertx.spi.cluster.redis.impl.support;
 
 import java.lang.reflect.InvocationTargetException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 //import io.vertx.core.logging.Logger;
 //import io.vertx.core.logging.LoggerFactory;
