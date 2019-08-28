@@ -17,25 +17,25 @@ package io.vertx.spi.cluster.redis.impl.support;
 
 import java.lang.reflect.InvocationTargetException;
 
-//import io.vertx.core.logging.Logger;
-//import io.vertx.core.logging.LoggerFactory;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import io.vertx.core.AsyncResult;
 import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
 import io.vertx.core.eventbus.DeliveryContext;
 import io.vertx.core.eventbus.Message;
+import io.vertx.core.eventbus.impl.EventBusImpl;
 import io.vertx.core.eventbus.impl.MessageImpl;
 import io.vertx.core.eventbus.impl.clustered.ClusterNodeInfo;
 import io.vertx.core.eventbus.impl.clustered.ClusteredEventBus;
 import io.vertx.core.eventbus.impl.clustered.ClusteredMessage;
+import io.vertx.core.logging.Logger;
+import io.vertx.core.logging.LoggerFactory;
+import io.vertx.core.net.impl.ServerID;
 import io.vertx.core.spi.cluster.AsyncMultiMap;
+import io.vertx.core.spi.cluster.ChoosableIterable;
 import io.vertx.core.spi.cluster.ClusterManager;
+import io.vertx.core.spi.metrics.EventBusMetrics;
 import io.vertx.spi.cluster.redis.FactorySupport.PendingMessageProcessor;
-//import io.vertx.spi.cluster.redis.impl.support.NonPublicAPI.ClusteredEventBusAPI.ConnectionHolderAPI;
 
 /**
  * FIXME: Retryable to choose another server ID
@@ -52,12 +52,14 @@ class PendingMessageProcessorImpl implements PendingMessageProcessor {
 	private static final String GENERATED_REPLY_ADDRESS_PREFIX = "__vertx.reply.";
 
 	private final String retryHeaderKey = "__retry_outbound_interceptor__";
+	private int failureCode = -2;
 
 	private Vertx vertx;
 	@SuppressWarnings("unused")
 	private ClusterManager clusterManager;
 	private ClusteredEventBus eventBus;
-	@SuppressWarnings("unused")
+	private final EventBusMetrics<?> metrics;
+
 	private AsyncMultiMap<String, ClusterNodeInfo> subs;
 
 	public PendingMessageProcessorImpl(Vertx vertx, ClusterManager clusterManager,
@@ -66,6 +68,7 @@ class PendingMessageProcessorImpl implements PendingMessageProcessor {
 		this.clusterManager = clusterManager;
 		this.eventBus = (ClusteredEventBus) vertx.eventBus();
 		this.subs = subs;
+		this.metrics = NonPublicAPI.Reflection.getFinalField(eventBus, EventBusImpl.class, "metrics");
 	}
 
 	@Override
@@ -123,8 +126,7 @@ class PendingMessageProcessorImpl implements PendingMessageProcessor {
 					if (isConnectionRefusedErr(ar.cause())) {
 						wrapWriteHandler.handle(Future.failedFuture(ar.cause()));
 						// resend(vertx, msg, ar.cause()); // FIXME: needed ?
-					}
-					else {
+					} else {
 						wrapWriteHandler.handle(Future.failedFuture(ar.cause()));
 					}
 				}
@@ -136,19 +138,146 @@ class PendingMessageProcessorImpl implements PendingMessageProcessor {
 	 * FIXME
 	 */
 	private void resend(Vertx vertx, ClusteredMessage<?, ?> msg, Throwable err) {
+		ServerID sender = getSender(msg);
+		ServerID receiver = getReceiver(err);
 		msg.headers().set(retryHeaderKey, msg.address());
-		msg.fail(-2, err.getMessage()); // Reply
+
+		if (receiver == null) {
+			log.info("(receiver == null): {}, sender: {}, failed receiver: {}, address: {}, replyAddress: {}", sender,
+					receiver, msg.address(), msg.replyAddress());
+			msg.fail(failureCode, err.getMessage()); // Reply
+			return;
+		}
+		subs.get(msg.address(), ar -> {
+			if (ar.succeeded()) {
+				ChoosableIterable<ClusterNodeInfo> serverIDs = ar.result();
+				if (serverIDs != null && !serverIDs.isEmpty()) {
+					// Choose one
+					ServerID sid = chooseNewOne(sender, receiver, serverIDs);
+					if (sid != null) {
+						log.info("Choose new receiver: {}, sender: {}, failed receiver: {}, address: {}, replyAddress: {}",
+								sid, sender, receiver, msg.address(), msg.replyAddress());
+						sendRemote(sid, msg);
+					} else {
+						log.debug("Choose another failure: sid: {}, sender: {}, failed receiver: {}, address: {}, replyAddress: {}", sid,
+								sender, receiver, msg.address(), msg.replyAddress());
+						msg.fail(failureCode, err.getMessage()); // Reply
+					}
+				} else {
+					log.debug("Choose another failure: serverIDs: {}, sender: {}, failed receiver: {}, address: {}, replyAddress: {}",
+							serverIDs, sender, receiver, msg.address(), msg.replyAddress());
+					msg.fail(failureCode, err.getMessage()); // Reply
+				}
+			} else {
+				log.debug("Choose another failure: error: {}, sender: {}, failed receiver: {}, address: {}, replyAddress: {}",
+						ar.cause().getMessage(), sender, receiver, msg.address(), msg.replyAddress());
+				msg.fail(failureCode, err.getMessage()); // Reply
+			}
+		});
 	}
 
-	private boolean isConnectionRefusedErr(Throwable e) {
-		boolean connectionRefusedErr = false;
-		while (e != null) {
+	private ServerID chooseNewOne(ServerID sender, ServerID receiver, ChoosableIterable<ClusterNodeInfo> serverIDs) {
+		ServerID entry = null;
+		boolean foundSender = false;
+		boolean foundReceiver = false;
+		ServerID newReceiver = null;
+		int loop = 0;
+		while (true) {
+			ClusterNodeInfo ci = serverIDs.choose();
+			ServerID sid = ci == null ? null : ci.serverID;
+			if (sid == null) {
+				break;
+			}
+
+			if (entry == null) {
+				entry = sid;
+			} else if (sid.equals(entry)) {
+				break;
+			}
+
+			if (sid.equals(sender)) {
+				if (foundSender) {
+					break;
+				} else {
+					foundSender = true;
+				}
+			} else if (sid.equals(receiver)) {
+				if (foundReceiver) {
+					break;
+				} else {
+					foundReceiver = true;
+				}
+			} else {
+				newReceiver = sid;
+				break;
+			}
+
+			if (++loop > 3) { // MAX: 3
+				break;
+			}
+		}
+		return newReceiver;
+	}
+
+	private void sendRemote(ServerID remoteServerID, ClusteredMessage<?, ?> msg) {
+		if (metrics != null) {
+			metrics.messageSent(msg.address(), false, false, true);
+		}
+		NonPublicAPI.Reflection.invokeMethod(eventBus, ClusteredEventBus.class, "sendRemote",
+				new Class[] { ServerID.class, MessageImpl.class }, new Object[] { remoteServerID, msg });
+	}
+
+	private ServerID getSender(ClusteredMessage<?, ?> msg) {
+		ServerID sender = NonPublicAPI.Reflection.invokeMethod(msg, ClusteredMessage.class, "getSender");
+		return sender;
+	}
+
+	private ServerID getReceiver(Throwable e) {
+		final String matchedPrefix = "Connection refused:";
+		ServerID receiver = null;
+		while (e != null && receiver == null) {
 			if (e instanceof InvocationTargetException) {
 				e = ((InvocationTargetException) e).getCause();
 			}
 			String errMsg = e.getMessage();
-			if (errMsg != null && errMsg.startsWith("Connection refused:")) { // Connection refused: /192.168.99.1:18081
+			if (errMsg != null && errMsg.startsWith(matchedPrefix)) { // Connection refused: /192.168.99.1:18081
+				String addr = errMsg.substring(matchedPrefix.length()).trim();
+				if (addr.startsWith("/")) {
+					addr = addr.substring(1);
+				}
+				int idx = addr.indexOf(':');
+				String host = null;
+				int port = -1;
+				if (idx != -1) {
+					host = addr.substring(0, idx);
+					try {
+						port = Integer.parseInt(addr.substring(idx + 1));
+					} catch (NumberFormatException ex) {
+						log.debug("errMsg: {}, parse port failed: {}", errMsg, ex.toString());
+						break;
+					}
+				}
+				if (host != null && port != -1) {
+					receiver = new ServerID(port, host);
+					break;
+				}
+			}
+			e = e.getCause();
+		}
+		return receiver;
+	}
+
+	private boolean isConnectionRefusedErr(Throwable e) {
+		final String matchedPrefix = "Connection refused:";
+		boolean connectionRefusedErr = false;
+		while (e != null && !connectionRefusedErr) {
+			if (e instanceof InvocationTargetException) {
+				e = ((InvocationTargetException) e).getCause();
+			}
+			String errMsg = e.getMessage();
+			if (errMsg != null && errMsg.startsWith(matchedPrefix)) { // Connection refused: /192.168.99.1:18081
 				connectionRefusedErr = true;
+				break;
 			}
 			e = e.getCause();
 		}

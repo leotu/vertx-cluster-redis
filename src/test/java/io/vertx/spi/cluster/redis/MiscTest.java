@@ -28,8 +28,6 @@ import org.junit.FixMethodOrder;
 import org.junit.Test;
 import org.junit.runners.MethodSorters;
 
-//import org.slf4j.Logger;
-//import org.slf4j.LoggerFactory;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.logging.SLF4JLogDelegateFactory;
@@ -40,11 +38,10 @@ import io.vertx.core.logging.SLF4JLogDelegateFactory;
  */
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class MiscTest {
-	private static final Logger log;
 	static {
 		System.setProperty(LoggerFactory.LOGGER_DELEGATE_FACTORY_CLASS_NAME, SLF4JLogDelegateFactory.class.getName());
-		log = LoggerFactory.getLogger(MiscTest.class);
 	}
+	private static final Logger log = LoggerFactory.getLogger(MiscTest.class);
 
 	@Test
 	public void test1ConcurrentMap() throws Exception {
@@ -63,15 +60,16 @@ public class MiscTest {
 		});
 		log.debug("cmap.size={}, cmap={}", cmap.size(), cmap);
 		Assert.assertNull(cmap.get("DEF"));
-		
+
 		Assert.assertEquals(cmap.size(), 1);
 	}
 
 	@Test
 	public void test2Scoe() throws Exception {
-		//final DateTimeFormatter iso8601WithMillisFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSxxx");
+		// final DateTimeFormatter iso8601WithMillisFormatter =
+		// DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSxxx");
 		final DateTimeFormatter iso8601WithMillisFormatter = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
-		
+
 //		long lastAccessed = new Date().getTime();
 		long lastAccessed = 1523248556694L;
 
@@ -83,7 +81,7 @@ public class MiscTest {
 		long lastAccessed2 = Date.from(zonedDateTime.toInstant()).getTime();
 
 		log.debug("lastAccessed2={}, iso8601Str={}", lastAccessed2, iso8601Str);
-		
+
 		Assert.assertEquals(lastAccessed, lastAccessed2);
 	}
 }

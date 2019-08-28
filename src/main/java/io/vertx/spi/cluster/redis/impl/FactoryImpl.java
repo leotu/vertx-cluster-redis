@@ -21,11 +21,11 @@ import org.redisson.api.RedissonClient;
 import org.redisson.client.codec.Codec;
 import org.redisson.client.codec.StringCodec;
 import org.redisson.codec.JsonJacksonCodec;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import io.vertx.core.Vertx;
 import io.vertx.core.eventbus.impl.clustered.ClusterNodeInfo;
+import io.vertx.core.logging.Logger;
+import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.shareddata.AsyncMap;
 import io.vertx.core.spi.cluster.AsyncMultiMap;
 import io.vertx.core.spi.cluster.ClusterManager;
@@ -42,7 +42,7 @@ import io.vertx.spi.cluster.redis.FactorySupport;
  */
 public class FactoryImpl implements Factory {
 	private static final Logger log = LoggerFactory.getLogger(FactoryImpl.class);
-//
+
 	private final SpecifyCodec specify = new SpecifyCodec();
 
 	@Override

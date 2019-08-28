@@ -21,17 +21,13 @@ import java.util.Map;
 import java.util.function.Predicate;
 
 import org.redisson.api.BatchOptions;
+import org.redisson.api.BatchOptions.ExecutionMode;
 import org.redisson.api.RBatch;
 import org.redisson.api.RSetMultimap;
 import org.redisson.api.RedissonClient;
-import org.redisson.api.BatchOptions.ExecutionMode;
 import org.redisson.client.codec.Codec;
 import org.redisson.client.codec.StringCodec;
 import org.redisson.codec.JsonJacksonCodec;
-//import io.vertx.core.logging.Logger;
-//import io.vertx.core.logging.LoggerFactory;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import io.vertx.core.AsyncResult;
 import io.vertx.core.Context;
@@ -39,6 +35,8 @@ import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
 import io.vertx.core.eventbus.impl.clustered.ClusterNodeInfo;
+import io.vertx.core.logging.Logger;
+import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.spi.cluster.ClusterManager;
 
 /**

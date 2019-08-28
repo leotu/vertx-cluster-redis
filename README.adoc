@@ -10,7 +10,15 @@ https://github.com/leotu/vertx-cluster-redis
 == Test docker
  
 [source,bash]
---------------
+----
 docker pull redis:alpine
 docker run --name demo.redis -e LANG=en.UTF-8 -e LC_ALL=en.UTF-8 -p 6379:6379 -d redis:alpine --requirepass "mypwd"
---------------
+----
+
+Tip: Useful commands:
+
+----
+docker container ls
+docker image ls (or docker images)
+docker container rm xxx
+----

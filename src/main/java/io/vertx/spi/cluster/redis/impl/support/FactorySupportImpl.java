@@ -15,8 +15,6 @@
  */
 package io.vertx.spi.cluster.redis.impl.support;
 
-//import org.slf4j.Logger;
-//import org.slf4j.LoggerFactory;
 
 import io.vertx.core.Vertx;
 import io.vertx.core.eventbus.impl.clustered.ClusterNodeInfo;
@@ -35,7 +33,6 @@ import io.vertx.spi.cluster.redis.FactorySupport;
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
 public class FactorySupportImpl implements FactorySupport {
-	//private static final Logger log = LoggerFactory.getLogger(FactorySupportImpl.class);
 
 	@Override
 	public PendingMessageProcessor createPendingMessageProcessor(Vertx vertx, ClusterManager clusterManager,

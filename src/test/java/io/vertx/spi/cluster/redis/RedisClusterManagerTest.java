@@ -28,16 +28,14 @@ import org.junit.runners.MethodSorters;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import io.vertx.core.CompositeFuture;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.core.VertxOptions;
-//import io.vertx.core.logging.Logger;
-//import io.vertx.core.logging.LoggerFactory;
-//import io.vertx.core.logging.SLF4JLogDelegateFactory;
+import io.vertx.core.logging.Logger;
+import io.vertx.core.logging.LoggerFactory;
+import io.vertx.core.logging.SLF4JLogDelegateFactory;
 import io.vertx.test.core.AsyncTestBase;
 
 /**
@@ -47,12 +45,11 @@ import io.vertx.test.core.AsyncTestBase;
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 @SuppressWarnings("deprecation")
 public class RedisClusterManagerTest extends AsyncTestBase {
+	static {
+		System.setProperty(LoggerFactory.LOGGER_DELEGATE_FACTORY_CLASS_NAME, SLF4JLogDelegateFactory.class.getName());
+		LoggerFactory.initialise();
+	}
 	private static final Logger log = LoggerFactory.getLogger(RedisClusterManagerTest.class);
-//	private static final Logger log;
-//	static {
-//		System.setProperty(LoggerFactory.LOGGER_DELEGATE_FACTORY_CLASS_NAME, SLF4JLogDelegateFactory.class.getName());
-//		log = LoggerFactory.getLogger(RedisClusterManagerTest.class);
-//	}
 
 //	private static RedissonClient redisson;
 

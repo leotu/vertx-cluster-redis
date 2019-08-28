@@ -19,8 +19,10 @@ package io.vertx.spi.cluster.redis;
 import org.junit.FixMethodOrder;
 import org.junit.Test;
 import org.junit.runners.MethodSorters;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import io.vertx.core.logging.Logger;
+import io.vertx.core.logging.LoggerFactory;
+import io.vertx.core.logging.SLF4JLogDelegateFactory;
 
 /**
  * 
@@ -28,16 +30,16 @@ import org.slf4j.LoggerFactory;
  */
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class RetriableReceiver2Test extends RetriableReceiverTest {
+	static {
+		System.setProperty(LoggerFactory.LOGGER_DELEGATE_FACTORY_CLASS_NAME, SLF4JLogDelegateFactory.class.getName());
+		LoggerFactory.initialise();
+	}
 	private static final Logger log = LoggerFactory.getLogger(RetriableReceiver2Test.class);
-//	private static final Logger log;
-//	static {
-//		System.setProperty(LoggerFactory.LOGGER_DELEGATE_FACTORY_CLASS_NAME, SLF4JLogDelegateFactory.class.getName());
-//		log = LoggerFactory.getLogger(RedisClusterManagerTest.class);
-//	}
+
 
 	@Override
 	protected int clusterPort() {
-		return 18081;
+		return 38080;
 	}
 
 	@Test

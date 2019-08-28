@@ -26,6 +26,9 @@ import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
 
+import io.vertx.core.logging.Logger;
+import io.vertx.core.logging.LoggerFactory;
+import io.vertx.core.logging.SLF4JLogDelegateFactory;
 import io.vertx.core.spi.cluster.ClusterManager;
 import io.vertx.ext.web.sstore.ClusteredSessionHandlerTest;
 
@@ -35,7 +38,12 @@ import io.vertx.ext.web.sstore.ClusteredSessionHandlerTest;
  */
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class RedisClusteredSessionHandlerTest extends ClusteredSessionHandlerTest {
-	// private static final Logger log = LoggerFactory.getLogger(RedisClusteredSessionHandlerTest.class);
+	static {
+		System.setProperty(LoggerFactory.LOGGER_DELEGATE_FACTORY_CLASS_NAME, SLF4JLogDelegateFactory.class.getName());
+		LoggerFactory.initialise();
+	}
+	@SuppressWarnings("unused")
+	private static final Logger log = LoggerFactory.getLogger(RedisClusteredSessionHandlerTest.class);
 
 	static private RedissonClient redisson;
 

@@ -28,8 +28,6 @@ import org.junit.FixMethodOrder;
 import org.junit.Test;
 import org.junit.runners.MethodSorters;
 
-//import org.slf4j.Logger;
-//import org.slf4j.LoggerFactory;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.logging.SLF4JLogDelegateFactory;
@@ -40,11 +38,10 @@ import io.vertx.core.logging.SLF4JLogDelegateFactory;
  */
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class IpUtil {
-	private static final Logger log;
 	static {
 		System.setProperty(LoggerFactory.LOGGER_DELEGATE_FACTORY_CLASS_NAME, SLF4JLogDelegateFactory.class.getName());
-		log = LoggerFactory.getLogger(IpUtil.class);
 	}
+	private static final Logger log = LoggerFactory.getLogger(IpUtil.class);
 
 	private static final String VALID_IP_ADDRESS_REGEX = //
 			"^([01]?\\d\\d?|2[0-4]\\d|25[0-5])\\." + //
@@ -127,7 +124,7 @@ public class IpUtil {
 			Assert.assertTrue(validIpAddress(ip));
 		}
 	}
-	
+
 	@Test
 	public void test2False() {
 		log.debug("========== false =======");

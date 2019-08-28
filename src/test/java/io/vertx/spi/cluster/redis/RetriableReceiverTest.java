@@ -27,15 +27,13 @@ import org.junit.runners.MethodSorters;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.core.VertxOptions;
-//import io.vertx.core.logging.Logger;
-//import io.vertx.core.logging.LoggerFactory;
-//import io.vertx.core.logging.SLF4JLogDelegateFactory;
+import io.vertx.core.logging.Logger;
+import io.vertx.core.logging.LoggerFactory;
+import io.vertx.core.logging.SLF4JLogDelegateFactory;
 import io.vertx.test.core.AsyncTestBase;
 
 /**
@@ -45,12 +43,11 @@ import io.vertx.test.core.AsyncTestBase;
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 @SuppressWarnings("deprecation")
 public class RetriableReceiverTest extends AsyncTestBase {
+	static {
+		System.setProperty(LoggerFactory.LOGGER_DELEGATE_FACTORY_CLASS_NAME, SLF4JLogDelegateFactory.class.getName());
+		LoggerFactory.initialise();
+	}
 	private static final Logger log = LoggerFactory.getLogger(RetriableReceiverTest.class);
-//	private static final Logger log;
-//	static {
-//		System.setProperty(LoggerFactory.LOGGER_DELEGATE_FACTORY_CLASS_NAME, SLF4JLogDelegateFactory.class.getName());
-//		log = LoggerFactory.getLogger(RedisClusterManagerTest.class);
-//	}
 
 	static protected RedissonClient createRedissonClient() {
 		log.debug("...");
@@ -73,7 +70,7 @@ public class RetriableReceiverTest extends AsyncTestBase {
 	}
 
 	protected int clusterPort() {
-		return 8081;
+		return 18080;
 	}
 
 	@Test
@@ -98,7 +95,7 @@ public class RetriableReceiverTest extends AsyncTestBase {
 
 		AtomicInteger counter = new AtomicInteger(0);
 		String address = "Retriable";
-		
+
 		// Receiver
 		Vertx.clusteredVertx(options1, res -> {
 			assertTrue(res.succeeded());
@@ -106,9 +103,10 @@ public class RetriableReceiverTest extends AsyncTestBase {
 
 			res.result().eventBus().<String>consumer(address, message -> {
 				assertNotNull(message);
-				if (counter.getAndIncrement() % 100 == 0) {
-					log.debug("{}, received message, clusterPort1: {}" , counter, clusterPort1);
-				}
+				counter.incrementAndGet();
+				// if (counter.getAndIncrement() % 100 == 0) {
+				log.debug("{}, received message, clusterPort1: {}", counter, clusterPort1);
+				// }
 				assertTrue(message.body().startsWith("hello"));
 				message.reply("ok:" + clusterPort1);
 			});

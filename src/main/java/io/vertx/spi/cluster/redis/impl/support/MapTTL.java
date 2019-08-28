@@ -39,10 +39,8 @@ import io.vertx.core.Context;
 import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-//import io.vertx.core.logging.Logger;
-//import io.vertx.core.logging.LoggerFactory;
+import io.vertx.core.logging.Logger;
+import io.vertx.core.logging.LoggerFactory;
 import io.vertx.spi.cluster.redis.ExpirableAsync;
 import io.vertx.spi.cluster.redis.impl.support.NonPublicAPI.Reflection;
 
