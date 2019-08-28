@@ -43,6 +43,7 @@ import io.vertx.spi.cluster.redis.Factory.NodeAttachListener;
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
 class RedisMapHaInfo extends RedisMap<String, String> implements NodeAttachListener {
+	@SuppressWarnings("unused")
 	private static final Logger log = LoggerFactory.getLogger(RedisMapHaInfo.class);
 
 	private final ClusterManager clusterManager;
@@ -72,7 +73,6 @@ class RedisMapHaInfo extends RedisMap<String, String> implements NodeAttachListe
 
 	@Override
 	public void attachListener(NodeListener nodeListener) {
-		log.debug("...");
 		this.nodeListener = nodeListener;
 	}
 
@@ -108,14 +108,12 @@ class RedisMapHaInfo extends RedisMap<String, String> implements NodeAttachListe
 	 * @see io.vertx.core.impl.HAManager#nodeLeft
 	 */
 	private void attachListener() {
-		log.info("### current nodeID: {}, nodeListener: {}", clusterManager.getNodeID(), nodeListener);
 		RMapCache<String, String> mapAsync = getMapAsync();
 		if (removedListeneId == 0) {
 			removedListeneId = mapAsync.addListener(new EntryRemovedListener<String, String>() {
 				@Override
 				public void onRemoved(EntryEvent<String, String> event) {
 					String nodeId = event.getKey();
-					log.info("### self: {}, onRemoved: {}", clusterManager.getNodeID(), nodeId);
 					if (nodeListener != null) {
 						nodeListener.nodeLeft(nodeId);
 					}
@@ -128,7 +126,6 @@ class RedisMapHaInfo extends RedisMap<String, String> implements NodeAttachListe
 				@Override
 				public void onExpired(EntryEvent<String, String> event) {
 					String nodeId = event.getKey();
-					log.info("### self: {}, onExpired: {}", clusterManager.getNodeID(), nodeId);
 					if (nodeListener != null) {
 						nodeListener.nodeLeft(nodeId);
 					}
@@ -141,7 +138,6 @@ class RedisMapHaInfo extends RedisMap<String, String> implements NodeAttachListe
 				@Override
 				public void onCreated(EntryEvent<String, String> event) {
 					String nodeId = event.getKey();
-					log.info("### self: {}, onCreated: {}", clusterManager.getNodeID(), nodeId);
 					if (nodeListener != null) {
 						nodeListener.nodeAdded(nodeId);
 					}
@@ -154,10 +150,7 @@ class RedisMapHaInfo extends RedisMap<String, String> implements NodeAttachListe
 				@Override
 				public void onUpdated(EntryEvent<String, String> event) {
 					String nodeId = event.getKey();
-					log.info("### self: {}, onUpdated: {}", clusterManager.getNodeID(), nodeId);
-					if (clusterManager.getNodeID().equals(nodeId)) { // only work on self's node
-						log.info("### Skip onUpdated is self: {}", nodeId);
-					} else {
+					if (nodeListener != null && !clusterManager.getNodeID().equals(nodeId)) {
 						nodeListener.nodeAdded(nodeId);
 					}
 				}

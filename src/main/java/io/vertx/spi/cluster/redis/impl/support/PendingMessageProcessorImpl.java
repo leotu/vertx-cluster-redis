@@ -122,7 +122,7 @@ class PendingMessageProcessorImpl implements PendingMessageProcessor {
 				} else {
 					if (isConnectionRefusedErr(ar.cause())) {
 						wrapWriteHandler.handle(Future.failedFuture(ar.cause()));
-						resend(vertx, msg, ar.cause());
+						// resend(vertx, msg, ar.cause()); // FIXME: needed ?
 					}
 					else {
 						wrapWriteHandler.handle(Future.failedFuture(ar.cause()));

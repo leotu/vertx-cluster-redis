@@ -186,10 +186,11 @@ public class RedisClusterManager implements ClusterManager {
 	public List<String> getNodes() {
 		List<String> nodes = haInfo.keySet().stream().map(e -> e.toString()).collect(Collectors.toList());
 		if (nodes.isEmpty()) {
-			log.info("(nodes.isEmpty()), nodeId: {}", nodeId);
-		} else {
-			log.debug("nodeId: {}, nodes.size: {}, nodes: {}", nodeId, nodes.size(), nodes);
-		}
+			log.debug("(nodes.isEmpty()), nodeId: {}", nodeId);
+		} 
+//		else {
+//			log.debug("nodeId: {}, nodes.size: {}, nodes: {}", nodeId, nodes.size(), nodes);
+//		}
 		return nodes;
 	}
 
@@ -203,8 +204,6 @@ public class RedisClusterManager implements ClusterManager {
 	 */
 	@Override
 	public void nodeListener(NodeListener nodeListener) {
-		log.debug("nodeListener...");
-
 		if (this.nodeListener != null) {
 			log.warn("(this.nodeListener != null), nodeId: {}", nodeId);
 			throw new IllegalStateException("(this.nodeListener != null), nodeId: " + nodeId);
@@ -220,7 +219,6 @@ public class RedisClusterManager implements ClusterManager {
 	 */
 	@Override
 	public void join(Handler<AsyncResult<Void>> resultHandler) {
-		log.debug("join...");
 		if (active.compareAndSet(false, true)) {
 			this.nodeId = UUID.randomUUID().toString();
 			vertx.getOrCreateContext().runOnContext(v -> Future.<Void>succeededFuture().setHandler(resultHandler));
@@ -239,7 +237,6 @@ public class RedisClusterManager implements ClusterManager {
 	@Override
 	public void leave(Handler<AsyncResult<Void>> resultHandler) {
 		if (active.compareAndSet(true, false)) {
-			log.debug("active: {}, nodeId: {}", active, nodeId);
 			vertx.getOrCreateContext().runOnContext(v -> Future.<Void>succeededFuture().setHandler(resultHandler));
 		} else {
 			// throw new IllegalStateException("Already inactive");

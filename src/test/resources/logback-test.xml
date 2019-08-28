@@ -12,9 +12,9 @@
 		</encoder>
 	</appender>
 
-	<logger name="io.netty" level="INFO" />
+	<logger name="io.netty" level="WARN" />
 	<logger name="org.redisson" level="INFO" />
-	<logger name="io.vertx.core.eventbus.impl.clustered" level="DEBUG" />
+	<logger name="io.vertx.core.eventbus.impl.clustered" level="WARN" />
 
 	<!-- *** -->
 	<root level="DEBUG">

@@ -115,7 +115,7 @@ public class RetriableSenderTest extends AsyncTestBase {
 					log.debug("{}, send message", i);
 					sleep("send: " + i, 20);
 				}
-				sleep("send:" + i, 100);
+				sleep("send:" + i, 10);
 				vertx.eventBus().<String>send(address, "hello:" + i, ar -> {
 					if (replyCountdown.get() % 1000 == 0) {
 						log.debug("{}, reply message", replyCountdown);
