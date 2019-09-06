@@ -52,15 +52,15 @@ class PendingMessageProcessorImpl implements PendingMessageProcessor {
 	private static final String GENERATED_REPLY_ADDRESS_PREFIX = "__vertx.reply.";
 
 	private final String retryHeaderKey = "__retry_outbound_interceptor__";
-	private int failureCode = -2;
+	private final int failureCode = -2;
 
 	private Vertx vertx;
 	@SuppressWarnings("unused")
-	private ClusterManager clusterManager;
-	private ClusteredEventBus eventBus;
+	private final ClusterManager clusterManager;
+	private final ClusteredEventBus eventBus;
 	private final EventBusMetrics<?> metrics;
 
-	private AsyncMultiMap<String, ClusterNodeInfo> subs;
+	private final AsyncMultiMap<String, ClusterNodeInfo> subs;
 
 	public PendingMessageProcessorImpl(Vertx vertx, ClusterManager clusterManager,
 			AsyncMultiMap<String, ClusterNodeInfo> subs) {
