@@ -18,6 +18,7 @@ package io.vertx.spi.cluster.redis;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -106,9 +107,10 @@ public class RetriableSenderTest extends AsyncTestBase {
 		String address = "Retriable";
 		
 		log.debug("send...");
+		AtomicBoolean error = new AtomicBoolean(false);
 		new Thread( () -> {
-			for (int i = 0; i < maxCount; i++) {
-				if (i % 200 == 0) {
+			for (int i = 0; i < maxCount && !error.get(); i++) {
+				if (i % 500 == 0) {
 					log.debug("{}, send message", i);
 					sleep("send: " + i, 20);
 				}
@@ -127,6 +129,7 @@ public class RetriableSenderTest extends AsyncTestBase {
 						assertTrue(ar.result().body().startsWith("ok:"));
 					} else {
 						log.warn("reply failed: {}", ar.cause().toString());
+						error.set(true);
 					}
 				});
 			}
@@ -147,7 +150,7 @@ public class RetriableSenderTest extends AsyncTestBase {
 		});
 
 		finish.await(1, TimeUnit.MINUTES);
-		sleep("END Before return");
+		sleep("END Before return, error: " + error);
 
 		closeRedissonClient(redisson2);
 	}

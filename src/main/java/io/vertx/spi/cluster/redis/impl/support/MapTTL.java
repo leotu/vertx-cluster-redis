@@ -48,7 +48,7 @@ import io.vertx.spi.cluster.redis.impl.support.NonPublicAPI.Reflection;
  *
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
-class MapTTL<K, V> implements ExpirableAsync<K> {
+public class MapTTL<K, V> implements ExpirableAsync<K> {
 	private static final Logger log = LoggerFactory.getLogger(MapTTL.class);
 
 	private final RedisStrictCommand<Long> ZSCORE_LONG = new RedisStrictCommand<Long>("ZSCORE",
@@ -67,6 +67,15 @@ class MapTTL<K, V> implements ExpirableAsync<K> {
 		this.name = name;
 	}
 
+	public MapTTL(Vertx vertx, RedissonClient redisson, String name, RMapCache<K, V> map) {
+		Objects.requireNonNull(redisson, "redisson");
+		Objects.requireNonNull(name, "name");
+		this.vertx = vertx;
+		this.redisson = redisson;
+		this.name = name;
+		this.setMap(map);
+	}
+	
 	protected void setMap(RMapCache<K, V> map) {
 		this.map = map;
 	}
@@ -102,7 +111,7 @@ class MapTTL<K, V> implements ExpirableAsync<K> {
 		commandExecutor.writeAsync(key, LongCodec.INSTANCE, RedisCommands.ZADD_INT, key, zaddOptions, currentTime, field)
 				.whenCompleteAsync((value, err) -> {
 					if (err == null) { // java.lang.Boolean / java.lang.Long
-						log.debug("value.class: {}, value: {}", value == null ? "<null>" : value.getClass().getName(), value);
+						// log.debug("value.class: {}, value: {}", value == null ? "<null>" : value.getClass().getName(), value);
 						Long numOfAdded = (Long) value; // num.longValue() == 0
 						// Boolean added = (Boolean) value;
 						context.runOnContext(vd -> resultHandler.handle(Future.succeededFuture(numOfAdded))); // (Boolean) value)

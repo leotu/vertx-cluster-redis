@@ -38,7 +38,6 @@ import io.vertx.core.spi.metrics.EventBusMetrics;
 import io.vertx.spi.cluster.redis.FactorySupport.PendingMessageProcessor;
 
 /**
- * FIXME: Retryable to choose another server ID
  * 
  * @see io.vertx.core.eventbus.impl.clustered.ConnectionHolder
  * @see io.vertx.core.eventbus.impl.clustered.ClusteredEventBus
@@ -48,7 +47,14 @@ import io.vertx.spi.cluster.redis.FactorySupport.PendingMessageProcessor;
 class PendingMessageProcessorImpl implements PendingMessageProcessor {
 	private static final Logger log = LoggerFactory.getLogger(PendingMessageProcessorImpl.class);
 
+	/**
+	 * @see io.vertx.core.eventbus.impl.clustered.ConnectionHolder
+	 */
 	private static final String PING_ADDRESS = "__vertx_ping";
+	
+	/**
+	 * @see io.vertx.core.eventbus.impl.clustered.ClusteredEventBus#generateReplyAddress
+	 */
 	private static final String GENERATED_REPLY_ADDRESS_PREFIX = "__vertx.reply.";
 
 	private final String retryHeaderKey = "__retry_outbound_interceptor__";

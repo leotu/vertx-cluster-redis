@@ -48,15 +48,21 @@ import io.vertx.spi.cluster.redis.Factory.NodeAttachListener;
 /**
  * https://github.com/redisson/redisson/wiki/11.-Redis-commands-mapping
  * 
- * @see io.vertx.core.impl.VertxFactoryImpl#clusteredVertx
  * 
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
 public class RedisClusterManager implements ClusterManager {
 	private static final Logger log = LoggerFactory.getLogger(RedisClusterManager.class);
 
-	private static final String CLUSTER_MAP_NAME = "__vertx.haInfo"; // FactoryImpl.CLUSTER_MAP_NAME;
-	private static final String SUBS_MAP_NAME = "__vertx.subs"; // FactoryImpl.SUBS_MAP_NAME;
+	/**
+	 *  @see io.vertx.core.impl.VertxImpl
+	 */
+	private static final String CLUSTER_MAP_NAME = "__vertx.haInfo";
+	
+	/**
+	 *  @see io.vertx.core.eventbus.impl.clustered.ClusteredEventBus
+	 */
+	private static final String SUBS_MAP_NAME = "__vertx.subs";
 
 	private static final Factory factory = Factory.createDefaultFactory();
 
