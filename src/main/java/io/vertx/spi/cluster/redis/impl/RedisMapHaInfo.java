@@ -115,11 +115,13 @@ class RedisMapHaInfo extends RedisMap<String, String> implements NodeAttachListe
 
   @Override
   public void putAll(Map<? extends String, ? extends String> m) {
+    log.warn("UnsupportedOperationException: putAll");
     throw new UnsupportedOperationException("putAll");
   }
 
   @Override
   public void replaceAll(BiFunction<? super String, ? super String, ? extends String> function) {
+    log.warn("UnsupportedOperationException: replaceAll");
     throw new UnsupportedOperationException("replaceAll");
   }
 
@@ -201,12 +203,18 @@ class RedisMapHaInfo extends RedisMap<String, String> implements NodeAttachListe
   // ===
   @Override
   public String put(String key, String value) {
+    if (refreshKv.size() > 1) {
+      log.warn("(refreshKv.size() > 1), key: {}, value: {}, refreshKv.size: {}", key, value, refreshKv.size());
+    }
     refreshKv.put(key, value);
     return getMapAsync().put(key, value, timeToLiveSeconds, TimeUnit.SECONDS);
   }
 
   @Override
   public String remove(Object key) {
+    if (refreshKv.size() != 1) {
+      log.warn("(refreshKv.size() != 1), key: {}, refreshKv.size: {}", key, refreshKv.size());
+    }
     refreshKv.remove(key);
     return super.remove(key);
   }
@@ -229,10 +237,14 @@ class RedisMapHaInfo extends RedisMap<String, String> implements NodeAttachListe
    */
   private void refreshAction(long counter) {
     String selfNodeId = clusterManager.getNodeID();
+    if (refreshKv.size() > 1) {
+      log.warn("(refreshKv.size() > 1), selfNodeId: {}, refreshKv.size: {}, selfNodeId: {}", selfNodeId, refreshKv.size(),
+          selfNodeId);
+    }
     refreshKv.forEach((k, v) -> {
       asyncTTL.refreshTTLIfPresent(k, timeToLiveSeconds, TimeUnit.SECONDS, ar -> {
         if (ar.failed()) {
-          log.warn("selfNodeId: {}, counter: {}, error: {}", selfNodeId, counter, ar.toString());
+          log.warn("selfNodeId: {}, counter: {}, error: {}", selfNodeId, counter, ar.cause().toString());
         }
       });
     });

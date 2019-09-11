@@ -86,7 +86,7 @@ class ChoosableSet<T> implements ChoosableIterable<T> {
       final String selfNodeId = Utility.clusterManager(vertx).getNodeID();
       if (!ci.nodeId.equals(selfNodeId)) {
         final Map<String, String> clusterMap = Utility.clusterMap(vertx);
-        if (!clusterMap.isEmpty() && !clusterMap.containsKey(ci.nodeId)) {
+        if (!clusterMap.isEmpty() && !clusterMap.containsKey(ci.nodeId)) {  // filter
           int max = clusterMap.size();
           for (int i = 0; i < max - 1; i++) {
             T next = chooseOne();

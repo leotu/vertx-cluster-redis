@@ -130,7 +130,11 @@ public class RetriableSenderTest extends AsyncTestBase {
           } else {
             log.warn("reply failed: {}", ar.cause().toString());
             error.set(true);
-            testComplete(); // XXX
+            try {
+              testComplete(); // XXX
+            } catch (Exception e) {
+              // ignored
+            }
           }
         });
       }
