@@ -30,22 +30,21 @@ import io.vertx.core.logging.SLF4JLogDelegateFactory;
  */
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class RetriableReceiver2Test extends RetriableReceiverTest {
-	static {
-		System.setProperty(LoggerFactory.LOGGER_DELEGATE_FACTORY_CLASS_NAME, SLF4JLogDelegateFactory.class.getName());
-		LoggerFactory.initialise();
-	}
-	private static final Logger log = LoggerFactory.getLogger(RetriableReceiver2Test.class);
+  static {
+    System.setProperty(LoggerFactory.LOGGER_DELEGATE_FACTORY_CLASS_NAME, SLF4JLogDelegateFactory.class.getName());
+    LoggerFactory.initialise();
+  }
+  private static final Logger log = LoggerFactory.getLogger(RetriableReceiver2Test.class);
 
+  @Override
+  protected int clusterPort() {
+    return 38080;
+  }
 
-	@Override
-	protected int clusterPort() {
-		return 38080;
-	}
-
-	@Test
-	@Override
-	public void test1EventBusP2P() throws Exception {
-		log.debug("BEGIN...");
-		super.test1EventBusP2P();
-	}
+  @Test
+  @Override
+  public void test1EventBusP2P() throws Exception {
+    log.debug("BEGIN...");
+    super.test1EventBusP2P();
+  }
 }

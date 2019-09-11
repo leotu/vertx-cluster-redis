@@ -38,114 +38,114 @@ import io.vertx.core.logging.SLF4JLogDelegateFactory;
  */
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class IpUtil {
-	static {
-		System.setProperty(LoggerFactory.LOGGER_DELEGATE_FACTORY_CLASS_NAME, SLF4JLogDelegateFactory.class.getName());
-	}
-	private static final Logger log = LoggerFactory.getLogger(IpUtil.class);
+  static {
+    System.setProperty(LoggerFactory.LOGGER_DELEGATE_FACTORY_CLASS_NAME, SLF4JLogDelegateFactory.class.getName());
+  }
+  private static final Logger log = LoggerFactory.getLogger(IpUtil.class);
 
-	private static final String VALID_IP_ADDRESS_REGEX = //
-			"^([01]?\\d\\d?|2[0-4]\\d|25[0-5])\\." + //
-					"([01]?\\d\\d?|2[0-4]\\d|25[0-5])\\." + //
-					"([01]?\\d\\d?|2[0-4]\\d|25[0-5])\\." + //
-					"([01]?\\d\\d?|2[0-4]\\d|25[0-5])$";
+  private static final String VALID_IP_ADDRESS_REGEX = //
+      "^([01]?\\d\\d?|2[0-4]\\d|25[0-5])\\." + //
+          "([01]?\\d\\d?|2[0-4]\\d|25[0-5])\\." + //
+          "([01]?\\d\\d?|2[0-4]\\d|25[0-5])\\." + //
+          "([01]?\\d\\d?|2[0-4]\\d|25[0-5])$";
 
-	// Pattern objects are thread safe
-	private static final Pattern VALID_IP_PATTERN = Pattern.compile(VALID_IP_ADDRESS_REGEX);
+  // Pattern objects are thread safe
+  private static final Pattern VALID_IP_PATTERN = Pattern.compile(VALID_IP_ADDRESS_REGEX);
 
-	static public boolean validIpAddress(String hostAddress) {
-		if (hostAddress.indexOf(':') != -1 || new StringTokenizer(hostAddress, ".").countTokens() != 4) {
-			return false;
-		}
-		return VALID_IP_PATTERN.matcher(hostAddress).matches();
-	}
+  static public boolean validIpAddress(String hostAddress) {
+    if (hostAddress.indexOf(':') != -1 || new StringTokenizer(hostAddress, ".").countTokens() != 4) {
+      return false;
+    }
+    return VALID_IP_PATTERN.matcher(hostAddress).matches();
+  }
 
-	static public String getLocalRealIP() {
-		return getLocalRealIP((hostAddress) -> {
-			return validIpAddress(hostAddress);
-		});
-	}
+  static public String getLocalRealIP() {
+    return getLocalRealIP((hostAddress) -> {
+      return validIpAddress(hostAddress);
+    });
+  }
 
-	static public String getLocalRealIP(Function<String, Boolean> filter) {
-		try {
-			Enumeration<NetworkInterface> nis = NetworkInterface.getNetworkInterfaces();
-			for (; nis.hasMoreElements();) {
-				NetworkInterface ni = nis.nextElement();
-				Enumeration<InetAddress> ia = ni.getInetAddresses();
-				for (; ia.hasMoreElements();) {
-					InetAddress addr = ia.nextElement();
-					String hostAddress = addr.getHostAddress();
-					if (addr.isSiteLocalAddress() && !addr.isLoopbackAddress()) {
-						if (filter != null) {
-							if (filter.apply(hostAddress)) {
-								return hostAddress;
-							}
-						} else {
-							return hostAddress;
-						}
-					} else if (validIpAddress(hostAddress) && !addr.isLoopbackAddress()) {
-						return hostAddress;
-					}
-				}
-			}
-			//
-			try {
-				return InetAddress.getLocalHost().getHostAddress();
-			} catch (UnknownHostException ee) {
-				log.warn(ee.toString());
-				return "127.0.0.1";
-			}
-		} catch (Exception e) {
-			log.warn(e.toString());
-			try {
-				return InetAddress.getLocalHost().getHostAddress();
-			} catch (UnknownHostException ee) {
-				log.warn(ee.toString());
-				return "127.0.0.1";
-			}
-		}
-	}
+  static public String getLocalRealIP(Function<String, Boolean> filter) {
+    try {
+      Enumeration<NetworkInterface> nis = NetworkInterface.getNetworkInterfaces();
+      for (; nis.hasMoreElements();) {
+        NetworkInterface ni = nis.nextElement();
+        Enumeration<InetAddress> ia = ni.getInetAddresses();
+        for (; ia.hasMoreElements();) {
+          InetAddress addr = ia.nextElement();
+          String hostAddress = addr.getHostAddress();
+          if (addr.isSiteLocalAddress() && !addr.isLoopbackAddress()) {
+            if (filter != null) {
+              if (filter.apply(hostAddress)) {
+                return hostAddress;
+              }
+            } else {
+              return hostAddress;
+            }
+          } else if (validIpAddress(hostAddress) && !addr.isLoopbackAddress()) {
+            return hostAddress;
+          }
+        }
+      }
+      //
+      try {
+        return InetAddress.getLocalHost().getHostAddress();
+      } catch (UnknownHostException ee) {
+        log.warn(ee.toString());
+        return "127.0.0.1";
+      }
+    } catch (Exception e) {
+      log.warn(e.toString());
+      try {
+        return InetAddress.getLocalHost().getHostAddress();
+      } catch (UnknownHostException ee) {
+        log.warn(ee.toString());
+        return "127.0.0.1";
+      }
+    }
+  }
 
-	@Test
-	public void test1True() {
-		log.debug("BEGIN...");
+  @Test
+  public void test1True() {
+    log.debug("BEGIN...");
 
-		log.debug("========== true =======");
-		String[] ips = new String[] { //
-				"1.1.1.1", //
-				"255.255.255.255", //
-				"192.168.1.1", //
-				"10.10.1.1", //
-				"132.254.111.10", //
-				"26.10.2.10", //
-				"127.0.0.1" };
+    log.debug("========== true =======");
+    String[] ips = new String[] { //
+        "1.1.1.1", //
+        "255.255.255.255", //
+        "192.168.1.1", //
+        "10.10.1.1", //
+        "132.254.111.10", //
+        "26.10.2.10", //
+        "127.0.0.1" };
 
-		for (String ip : ips) {
-			log.debug("{} = {}", ip, validIpAddress(ip));
-			Assert.assertTrue(validIpAddress(ip));
-		}
-	}
+    for (String ip : ips) {
+      log.debug("{} = {}", ip, validIpAddress(ip));
+      Assert.assertTrue(validIpAddress(ip));
+    }
+  }
 
-	@Test
-	public void test2False() {
-		log.debug("========== false =======");
-		String[] ips2 = new String[] { //
-				"10.10.10", //
-				"10.10", //
-				"10", //
-				"a.a.a.a", //
-				"10.0.0.a", //
-				"10.10.10.256", //
-				"222.222.2.999", //
-				"999.10.10.20", //
-				"2222.22.22.22", //
-				"22.2222.22.2", //
-				"10.10.10", //
-				"10.10.10" };
-		for (String ip : ips2) {
-			log.debug("{} = {}", ip, validIpAddress(ip));
-			Assert.assertFalse(validIpAddress(ip));
-		}
+  @Test
+  public void test2False() {
+    log.debug("========== false =======");
+    String[] ips2 = new String[] { //
+        "10.10.10", //
+        "10.10", //
+        "10", //
+        "a.a.a.a", //
+        "10.0.0.a", //
+        "10.10.10.256", //
+        "222.222.2.999", //
+        "999.10.10.20", //
+        "2222.22.22.22", //
+        "22.2222.22.2", //
+        "10.10.10", //
+        "10.10.10" };
+    for (String ip : ips2) {
+      log.debug("{} = {}", ip, validIpAddress(ip));
+      Assert.assertFalse(validIpAddress(ip));
+    }
 
-		log.debug("END.");
-	}
+    log.debug("END.");
+  }
 }

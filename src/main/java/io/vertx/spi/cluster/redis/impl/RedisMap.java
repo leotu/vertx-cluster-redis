@@ -32,96 +32,96 @@ import io.vertx.core.Vertx;
  */
 class RedisMap<K, V> implements Map<K, V> {
 
-	protected final Vertx vertx;
-	protected final RMap<K, V> map;
-	protected final String name;
+  protected final Vertx vertx;
+  protected final RMap<K, V> map;
+  protected final String name;
 
-	public RedisMap(Vertx vertx, RedissonClient redisson, String name, Codec codec) {
-		Objects.requireNonNull(redisson, "redisson");
-		Objects.requireNonNull(name, "name");
-		this.vertx = vertx;
-		this.name = name;
-		this.map = createMap(redisson, this.name, codec);
-	}
+  public RedisMap(Vertx vertx, RedissonClient redisson, String name, Codec codec) {
+    Objects.requireNonNull(redisson, "redisson");
+    Objects.requireNonNull(name, "name");
+    this.vertx = vertx;
+    this.name = name;
+    this.map = createMap(redisson, this.name, codec);
+  }
 
-	/**
-	 * Here you can customize(override method) a "Codec"
-	 * 
-	 * @see org.redisson.codec.JsonJacksonCodec
-	 */
-	protected RMap<K, V> createMap(RedissonClient redisson, String name, Codec codec) {
-		if (codec == null) {
-			return redisson.getMap(name);
-		} else {
-			return redisson.getMap(name, codec);
-		}
-	}
+  /**
+   * Here you can customize(override method) a "Codec"
+   * 
+   * @see org.redisson.codec.JsonJacksonCodec
+   */
+  protected RMap<K, V> createMap(RedissonClient redisson, String name, Codec codec) {
+    if (codec == null) {
+      return redisson.getMap(name);
+    } else {
+      return redisson.getMap(name, codec);
+    }
+  }
 
-	@Override
-	public int size() {
-		return map.size();
-	}
+  @Override
+  public int size() {
+    return map.size();
+  }
 
-	@Override
-	public boolean isEmpty() {
-		return map.isEmpty();
-	}
+  @Override
+  public boolean isEmpty() {
+    return map.isEmpty();
+  }
 
-	@Override
-	public boolean containsKey(Object key) {
-		return map.containsKey(key);
-	}
+  @Override
+  public boolean containsKey(Object key) {
+    return map.containsKey(key);
+  }
 
-	@Override
-	public boolean containsValue(Object value) {
-		return map.containsValue(value);
-	}
+  @Override
+  public boolean containsValue(Object value) {
+    return map.containsValue(value);
+  }
 
-	@Override
-	public V get(Object key) {
-		return map.get(key);
-	}
+  @Override
+  public V get(Object key) {
+    return map.get(key);
+  }
 
-	@Override
-	public V put(K key, V value) {
-		return map.put(key, value);
-	}
+  @Override
+  public V put(K key, V value) {
+    return map.put(key, value);
+  }
 
-	@Override
-	public V remove(Object key) {
-		return map.remove(key);
-	}
+  @Override
+  public V remove(Object key) {
+    return map.remove(key);
+  }
 
-	@Override
-	public void putAll(Map<? extends K, ? extends V> m) {
-		map.putAll(m);
-	}
+  @Override
+  public void putAll(Map<? extends K, ? extends V> m) {
+    map.putAll(m);
+  }
 
-	@Override
-	public void clear() {
-		map.clear();
-	}
+  @Override
+  public void clear() {
+    map.clear();
+  }
 
-	@Override
-	public Set<K> keySet() {
-		// "map.keySet()" <b>DOESN'T</b> fetch all of them as {@link #readAllKeySet()} does.
-		return map.readAllKeySet();
-	}
+  @Override
+  public Set<K> keySet() {
+    // "map.keySet()" <b>DOESN'T</b> fetch all of them as {@link #readAllKeySet()} does.
+    return map.readAllKeySet();
+  }
 
-	@Override
-	public Collection<V> values() {
-		// "map.values()" <b>DOESN'T</b> fetch all of them as {@link #readAllValues()} does.
-		return map.readAllValues();
-	}
+  @Override
+  public Collection<V> values() {
+    // "map.values()" <b>DOESN'T</b> fetch all of them as {@link #readAllValues()} does.
+    return map.readAllValues();
+  }
 
-	@Override
-	public Set<Entry<K, V>> entrySet() {
-		// "map.entrySet()" <b>DOESN'T</b> fetch all of them as {@link #readAllEntrySet()} does.
-		return map.readAllEntrySet();
-	}
+  @Override
+  public Set<Entry<K, V>> entrySet() {
+    // "map.entrySet()" <b>DOESN'T</b> fetch all of them as {@link #readAllEntrySet()} does.
+    return map.readAllEntrySet();
+  }
 
-	@Override
-	public String toString() {
-		return super.toString() + "{name=" + name + "}";
-	}
+  @Override
+  public String toString() {
+    return super.toString() + "{name=" + name + "}";
+  }
 }

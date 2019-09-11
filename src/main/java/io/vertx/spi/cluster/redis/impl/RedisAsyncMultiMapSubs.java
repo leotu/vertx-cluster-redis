@@ -52,76 +52,76 @@ import io.vertx.core.spi.cluster.ClusterManager;
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
 class RedisAsyncMultiMapSubs extends RedisAsyncMultiMap<String, ClusterNodeInfo> {
-	private static final Logger log = LoggerFactory.getLogger(RedisAsyncMultiMapSubs.class);
+  private static final Logger log = LoggerFactory.getLogger(RedisAsyncMultiMapSubs.class);
 
-	@SuppressWarnings("unused")
-	private final ClusterManager clusterManager;
+  @SuppressWarnings("unused")
+  private final ClusterManager clusterManager;
 
-	public RedisAsyncMultiMapSubs(Vertx vertx, ClusterManager clusterManager, RedissonClient redisson, String name) {
-		super(vertx, redisson, name, null);
-		this.clusterManager = clusterManager;
-	}
+  public RedisAsyncMultiMapSubs(Vertx vertx, ClusterManager clusterManager, RedissonClient redisson, String name) {
+    super(vertx, redisson, name, null);
+    this.clusterManager = clusterManager;
+  }
 
-	/**
-	 * 
-	 * @see org.redisson.client.codec.StringCodec
-	 * @see org.redisson.codec.JsonJacksonCodec
-	 */
-	@Override
-	protected RSetMultimap<String, ClusterNodeInfo> createMultimap(RedissonClient redisson, String name, Codec codec) {
-		RSetMultimap<String, ClusterNodeInfo> mmap = redisson.getSetMultimap(name, new KeyValueCodec(//
-				JsonJacksonCodec.INSTANCE.getValueEncoder(), JsonJacksonCodec.INSTANCE.getValueDecoder(), //
-				StringCodec.INSTANCE.getMapKeyEncoder(), StringCodec.INSTANCE.getMapKeyDecoder(), //
-				JsonJacksonCodec.INSTANCE.getValueEncoder(), JsonJacksonCodec.INSTANCE.getValueDecoder()));
-		return mmap;
-	}
+  /**
+   * 
+   * @see org.redisson.client.codec.StringCodec
+   * @see org.redisson.codec.JsonJacksonCodec
+   */
+  @Override
+  protected RSetMultimap<String, ClusterNodeInfo> createMultimap(RedissonClient redisson, String name, Codec codec) {
+    RSetMultimap<String, ClusterNodeInfo> mmap = redisson.getSetMultimap(name, new KeyValueCodec(//
+        JsonJacksonCodec.INSTANCE.getValueEncoder(), JsonJacksonCodec.INSTANCE.getValueDecoder(), //
+        StringCodec.INSTANCE.getMapKeyEncoder(), StringCodec.INSTANCE.getMapKeyDecoder(), //
+        JsonJacksonCodec.INSTANCE.getValueEncoder(), JsonJacksonCodec.INSTANCE.getValueDecoder()));
+    return mmap;
+  }
 
-	@Override
-	public void removeAllForValue(ClusterNodeInfo v, Handler<AsyncResult<Void>> completionHandler) {
-		removeAllMatching(value -> value == v || value.equals(v), completionHandler);
-	}
+  @Override
+  public void removeAllForValue(ClusterNodeInfo v, Handler<AsyncResult<Void>> completionHandler) {
+    removeAllMatching(value -> value == v || value.equals(v), completionHandler);
+  }
 
-	/**
-	 * Remove values which satisfies the given predicate in all keys.
-	 * 
-	 * @see io.vertx.core.eventbus.impl.clustered.ClusteredEventBus#setClusterViewChangedHandler
-	 */
-	@Override
-	public void removeAllMatching(Predicate<ClusterNodeInfo> p, Handler<AsyncResult<Void>> completionHandler) {
-		Context context = vertx.getOrCreateContext();
-		batchRemoveAllMatching(p, ar -> {
-			if (ar.failed()) {
-				context.runOnContext(vd -> completionHandler.handle(Future.failedFuture(ar.cause())));
-			} else {
-				context.runOnContext(vd -> completionHandler.handle(Future.succeededFuture(ar.result())));
-			}
-		});
-	}
+  /**
+   * Remove values which satisfies the given predicate in all keys.
+   * 
+   * @see io.vertx.core.eventbus.impl.clustered.ClusteredEventBus#setClusterViewChangedHandler
+   */
+  @Override
+  public void removeAllMatching(Predicate<ClusterNodeInfo> p, Handler<AsyncResult<Void>> completionHandler) {
+    Context context = vertx.getOrCreateContext();
+    batchRemoveAllMatching(p, ar -> {
+      if (ar.failed()) {
+        context.runOnContext(vd -> completionHandler.handle(Future.failedFuture(ar.cause())));
+      } else {
+        context.runOnContext(vd -> completionHandler.handle(Future.succeededFuture(ar.result())));
+      }
+    });
+  }
 
-	private void batchRemoveAllMatching(Predicate<ClusterNodeInfo> p, Handler<AsyncResult<Void>> completionHandler) {
-		List<Map.Entry<String, ClusterNodeInfo>> deletedList = new ArrayList<>();
-		mmap.entries().forEach(entry -> {
-			ClusterNodeInfo value = entry.getValue();
-			if (p.test(value)) { // XXX: "!members.contains(ci.nodeId)"
-				deletedList.add(entry);
-			}
-		});
+  private void batchRemoveAllMatching(Predicate<ClusterNodeInfo> p, Handler<AsyncResult<Void>> completionHandler) {
+    List<Map.Entry<String, ClusterNodeInfo>> deletedList = new ArrayList<>();
+    mmap.entries().forEach(entry -> {
+      ClusterNodeInfo value = entry.getValue();
+      if (p.test(value)) { // XXX: "!members.contains(ci.nodeId)"
+        deletedList.add(entry);
+      }
+    });
 
-		if (!deletedList.isEmpty()) {
-			RBatch batch = redisson.createBatch(BatchOptions.defaults().executionMode(ExecutionMode.IN_MEMORY_ATOMIC).skipResult());
-			deletedList.forEach(entry -> {
-				mmap.removeAsync(entry.getKey(), entry.getValue());
-			});
+    if (!deletedList.isEmpty()) {
+      RBatch batch = redisson.createBatch(BatchOptions.defaults().executionMode(ExecutionMode.IN_MEMORY_ATOMIC).skipResult());
+      deletedList.forEach(entry -> {
+        mmap.removeAsync(entry.getKey(), entry.getValue());
+      });
 
-			batch.executeAsync().whenCompleteAsync((result, e) -> {
-				if (e != null) {
-					log.warn("error: {}", e.toString());
-					completionHandler.handle(Future.failedFuture(e));
-				} else { // XXX: skipResult() ==> result.class=<null>, result=null
-					completionHandler.handle(Future.succeededFuture());
-				}
-			});
-		}
-	}
+      batch.executeAsync().whenCompleteAsync((result, e) -> {
+        if (e != null) {
+          log.warn("error: {}", e.toString());
+          completionHandler.handle(Future.failedFuture(e));
+        } else { // XXX: skipResult() ==> result.class=<null>, result=null
+          completionHandler.handle(Future.succeededFuture());
+        }
+      });
+    }
+  }
 
 }

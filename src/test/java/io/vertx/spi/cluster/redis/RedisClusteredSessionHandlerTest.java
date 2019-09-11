@@ -38,45 +38,45 @@ import io.vertx.ext.web.sstore.ClusteredSessionHandlerTest;
  */
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class RedisClusteredSessionHandlerTest extends ClusteredSessionHandlerTest {
-	static {
-		System.setProperty(LoggerFactory.LOGGER_DELEGATE_FACTORY_CLASS_NAME, SLF4JLogDelegateFactory.class.getName());
-		LoggerFactory.initialise();
-	}
-	@SuppressWarnings("unused")
-	private static final Logger log = LoggerFactory.getLogger(RedisClusteredSessionHandlerTest.class);
+  static {
+    System.setProperty(LoggerFactory.LOGGER_DELEGATE_FACTORY_CLASS_NAME, SLF4JLogDelegateFactory.class.getName());
+    LoggerFactory.initialise();
+  }
+  @SuppressWarnings("unused")
+  private static final Logger log = LoggerFactory.getLogger(RedisClusteredSessionHandlerTest.class);
 
-	static private RedissonClient redisson;
+  static private RedissonClient redisson;
 
-	@BeforeClass
-	static public void beforeClass() {
-		Config config = new Config();
-		config.useSingleServer() //
-				.setAddress("redis://127.0.0.1:6379") //
-				.setDatabase(1) //
-				.setPassword("mypwd") //
-				.setConnectionMinimumIdleSize(5);
-		redisson = Redisson.create(config);
-	}
+  @BeforeClass
+  static public void beforeClass() {
+    Config config = new Config();
+    config.useSingleServer() //
+        .setAddress("redis://127.0.0.1:6379") //
+        .setDatabase(1) //
+        .setPassword("mypwd") //
+        .setConnectionMinimumIdleSize(5);
+    redisson = Redisson.create(config);
+  }
 
-	@AfterClass
-	static public void afterClass() {
-		redisson.shutdown();
-	}
+  @AfterClass
+  static public void afterClass() {
+    redisson.shutdown();
+  }
 
-	@Override
-	public void setUp() throws Exception {
-		super.setUp();
+  @Override
+  public void setUp() throws Exception {
+    super.setUp();
 
-		CountDownLatch ready = new CountDownLatch(1);
-		store.clear(ar -> {
-			ready.countDown();
-		});
-		ready.await();
-	}
+    CountDownLatch ready = new CountDownLatch(1);
+    store.clear(ar -> {
+      ready.countDown();
+    });
+    ready.await();
+  }
 
-	@Override
-	protected ClusterManager getClusterManager() {
-		return new RedisClusterManager(redisson);
-	}
+  @Override
+  protected ClusterManager getClusterManager() {
+    return new RedisClusterManager(redisson);
+  }
 
 }

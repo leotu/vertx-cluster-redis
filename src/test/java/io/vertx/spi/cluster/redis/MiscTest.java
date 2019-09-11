@@ -38,50 +38,50 @@ import io.vertx.core.logging.SLF4JLogDelegateFactory;
  */
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class MiscTest {
-	static {
-		System.setProperty(LoggerFactory.LOGGER_DELEGATE_FACTORY_CLASS_NAME, SLF4JLogDelegateFactory.class.getName());
-	}
-	private static final Logger log = LoggerFactory.getLogger(MiscTest.class);
+  static {
+    System.setProperty(LoggerFactory.LOGGER_DELEGATE_FACTORY_CLASS_NAME, SLF4JLogDelegateFactory.class.getName());
+  }
+  private static final Logger log = LoggerFactory.getLogger(MiscTest.class);
 
-	@Test
-	public void test1ConcurrentMap() throws Exception {
-		final ConcurrentMap<String, String> cmap = new ConcurrentHashMap<>();
+  @Test
+  public void test1ConcurrentMap() throws Exception {
+    final ConcurrentMap<String, String> cmap = new ConcurrentHashMap<>();
 
-		cmap.computeIfAbsent("ABC", key -> {
-			log.debug("key={}", key);
-			return "123";
-		});
-		log.debug("cmap.size={}, cmap={}", cmap.size(), cmap);
-		Assert.assertEquals(cmap.get("ABC"), "123");
+    cmap.computeIfAbsent("ABC", key -> {
+      log.debug("key={}", key);
+      return "123";
+    });
+    log.debug("cmap.size={}, cmap={}", cmap.size(), cmap);
+    Assert.assertEquals(cmap.get("ABC"), "123");
 
-		cmap.computeIfAbsent("DEF", key -> {
-			log.debug("key={}", key);
-			return null;
-		});
-		log.debug("cmap.size={}, cmap={}", cmap.size(), cmap);
-		Assert.assertNull(cmap.get("DEF"));
+    cmap.computeIfAbsent("DEF", key -> {
+      log.debug("key={}", key);
+      return null;
+    });
+    log.debug("cmap.size={}, cmap={}", cmap.size(), cmap);
+    Assert.assertNull(cmap.get("DEF"));
 
-		Assert.assertEquals(cmap.size(), 1);
-	}
+    Assert.assertEquals(cmap.size(), 1);
+  }
 
-	@Test
-	public void test2Scoe() throws Exception {
-		// final DateTimeFormatter iso8601WithMillisFormatter =
-		// DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSxxx");
-		final DateTimeFormatter iso8601WithMillisFormatter = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
+  @Test
+  public void test2Scoe() throws Exception {
+    // final DateTimeFormatter iso8601WithMillisFormatter =
+    // DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSxxx");
+    final DateTimeFormatter iso8601WithMillisFormatter = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
 
-//		long lastAccessed = new Date().getTime();
-		long lastAccessed = 1523248556694L;
+    //		long lastAccessed = new Date().getTime();
+    long lastAccessed = 1523248556694L;
 
-		OffsetDateTime dateTime = OffsetDateTime.ofInstant(new Date(lastAccessed).toInstant(), ZoneId.systemDefault());
-		String iso8601Str = dateTime.format(iso8601WithMillisFormatter);
-		log.debug("lastAccessed ={}, iso8601Str={}", lastAccessed, iso8601Str);
+    OffsetDateTime dateTime = OffsetDateTime.ofInstant(new Date(lastAccessed).toInstant(), ZoneId.systemDefault());
+    String iso8601Str = dateTime.format(iso8601WithMillisFormatter);
+    log.debug("lastAccessed ={}, iso8601Str={}", lastAccessed, iso8601Str);
 
-		ZonedDateTime zonedDateTime = ZonedDateTime.parse(iso8601Str, iso8601WithMillisFormatter);
-		long lastAccessed2 = Date.from(zonedDateTime.toInstant()).getTime();
+    ZonedDateTime zonedDateTime = ZonedDateTime.parse(iso8601Str, iso8601WithMillisFormatter);
+    long lastAccessed2 = Date.from(zonedDateTime.toInstant()).getTime();
 
-		log.debug("lastAccessed2={}, iso8601Str={}", lastAccessed2, iso8601Str);
+    log.debug("lastAccessed2={}, iso8601Str={}", lastAccessed2, iso8601Str);
 
-		Assert.assertEquals(lastAccessed, lastAccessed2);
-	}
+    Assert.assertEquals(lastAccessed, lastAccessed2);
+  }
 }

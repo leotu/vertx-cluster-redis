@@ -51,182 +51,182 @@ import io.vertx.core.spi.cluster.ChoosableIterable;
  * @author <a href="mailto:leo.tu.taipei@gmail.com">Leo Tu</a>
  */
 class RedisAsyncMultiMap<K, V> implements AsyncMultiMap<K, V> {
-	private static final Logger log = LoggerFactory.getLogger(RedisAsyncMultiMap.class);
+  private static final Logger log = LoggerFactory.getLogger(RedisAsyncMultiMap.class);
 
-	protected final ConcurrentMap<K, ChoosableSet<V>> choosableSetPtr = new ConcurrentHashMap<>();
-	protected final RedissonClient redisson;
-	protected final Vertx vertx;
-	protected final RSetMultimap<K, V> mmap;
-	protected final String name;
+  protected final ConcurrentMap<K, ChoosableSet<V>> choosableSetPtr = new ConcurrentHashMap<>();
+  protected final RedissonClient redisson;
+  protected final Vertx vertx;
+  protected final RSetMultimap<K, V> mmap;
+  protected final String name;
 
-	public RedisAsyncMultiMap(Vertx vertx, RedissonClient redisson, String name, Codec codec) {
-		Objects.requireNonNull(redisson, "redisson");
-		Objects.requireNonNull(name, "name");
-		this.vertx = vertx;
-		this.redisson = redisson;
-		this.name = name;
-		this.mmap = createMultimap(this.redisson, this.name, codec);
-	}
+  public RedisAsyncMultiMap(Vertx vertx, RedissonClient redisson, String name, Codec codec) {
+    Objects.requireNonNull(redisson, "redisson");
+    Objects.requireNonNull(name, "name");
+    this.vertx = vertx;
+    this.redisson = redisson;
+    this.name = name;
+    this.mmap = createMultimap(this.redisson, this.name, codec);
+  }
 
-	/**
-	 * Here you can customize(override method) a "Codec"
-	 * 
-	 * @see org.redisson.codec.JsonJacksonCodec
-	 */
-	protected RSetMultimap<K, V> createMultimap(RedissonClient redisson, String name, Codec codec) {
-		if (codec == null) {
-			return redisson.getSetMultimap(name); // redisson.getSetMultimapCache(name);
-		} else {
-			return redisson.getSetMultimap(name, codec);
-		}
-	}
+  /**
+   * Here you can customize(override method) a "Codec"
+   * 
+   * @see org.redisson.codec.JsonJacksonCodec
+   */
+  protected RSetMultimap<K, V> createMultimap(RedissonClient redisson, String name, Codec codec) {
+    if (codec == null) {
+      return redisson.getSetMultimap(name); // redisson.getSetMultimapCache(name);
+    } else {
+      return redisson.getSetMultimap(name, codec);
+    }
+  }
 
-	@Override
-	public void add(K k, V v, Handler<AsyncResult<Void>> completionHandler) {
-		Context context = vertx.getOrCreateContext();
-		mmap.putAsync(k, v).whenComplete((added, e) -> context.runOnContext(vd -> //
-		completionHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture())) //
-		);
-	}
+  @Override
+  public void add(K k, V v, Handler<AsyncResult<Void>> completionHandler) {
+    Context context = vertx.getOrCreateContext();
+    mmap.putAsync(k, v).whenComplete((added, e) -> context.runOnContext(vd -> //
+    completionHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture())) //
+    );
+  }
 
-	/**
-	 * @see io.vertx.core.eventbus.impl.clustered.ClusteredEventBus#sendOrPub(SendContextImpl<T>)
-	 */
-	@Override
-	public void get(K k, Handler<AsyncResult<ChoosableIterable<V>>> resultHandler) {
-		Context context = vertx.getOrCreateContext();
-		mmap.getAllAsync(k).whenComplete((v, e) -> { // v class is java.util.LinkedHashSet
-			if (e != null) {
-				context.runOnContext(vd -> resultHandler.handle(Future.failedFuture(e)));
-			} else {
-				context.runOnContext(vd -> resultHandler.handle(Future.succeededFuture(getCurrentRef(k, v))));
-			}
-		});
+  /**
+   * @see io.vertx.core.eventbus.impl.clustered.ClusteredEventBus#sendOrPub(SendContextImpl<T>)
+   */
+  @Override
+  public void get(K k, Handler<AsyncResult<ChoosableIterable<V>>> resultHandler) {
+    Context context = vertx.getOrCreateContext();
+    mmap.getAllAsync(k).whenComplete((v, e) -> { // v class is java.util.LinkedHashSet
+      if (e != null) {
+        context.runOnContext(vd -> resultHandler.handle(Future.failedFuture(e)));
+      } else {
+        context.runOnContext(vd -> resultHandler.handle(Future.succeededFuture(getCurrentRef(k, v))));
+      }
+    });
 
-	}
+  }
 
-	@Override
-	public void remove(K k, V v, Handler<AsyncResult<Boolean>> completionHandler) {
-		Context context = vertx.getOrCreateContext();
-		mmap.removeAsync(k, v).whenComplete((removed, e) -> context.runOnContext(vd -> //
-		completionHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(removed))) //
-		);
-	}
+  @Override
+  public void remove(K k, V v, Handler<AsyncResult<Boolean>> completionHandler) {
+    Context context = vertx.getOrCreateContext();
+    mmap.removeAsync(k, v).whenComplete((removed, e) -> context.runOnContext(vd -> //
+    completionHandler.handle(e != null ? Future.failedFuture(e) : Future.succeededFuture(removed))) //
+    );
+  }
 
-	@Override
-	public void removeAllForValue(V v, Handler<AsyncResult<Void>> completionHandler) {
-		removeAllMatching(value -> value == v || value.equals(v), completionHandler);
-	}
+  @Override
+  public void removeAllForValue(V v, Handler<AsyncResult<Void>> completionHandler) {
+    removeAllMatching(value -> value == v || value.equals(v), completionHandler);
+  }
 
-	/**
-	 * Remove values which satisfies the given predicate in all keys.
-	 */
-	@Override
-	public void removeAllMatching(Predicate<V> p, Handler<AsyncResult<Void>> completionHandler) {
-		Context context = vertx.getOrCreateContext();
-		batchRemoveAllMatching(p, ar -> {
-			if (ar.failed()) {
-				context.runOnContext(vd -> completionHandler.handle(Future.failedFuture(ar.cause())));
-			} else {
-				context.runOnContext(vd -> completionHandler.handle(Future.succeededFuture(ar.result())));
-			}
-		});
-	}
+  /**
+   * Remove values which satisfies the given predicate in all keys.
+   */
+  @Override
+  public void removeAllMatching(Predicate<V> p, Handler<AsyncResult<Void>> completionHandler) {
+    Context context = vertx.getOrCreateContext();
+    batchRemoveAllMatching(p, ar -> {
+      if (ar.failed()) {
+        context.runOnContext(vd -> completionHandler.handle(Future.failedFuture(ar.cause())));
+      } else {
+        context.runOnContext(vd -> completionHandler.handle(Future.succeededFuture(ar.result())));
+      }
+    });
+  }
 
-	@SuppressWarnings({ "rawtypes", "deprecation" })
-	private void batchRemoveAllMatching(Predicate<V> p, Handler<AsyncResult<Void>> completionHandler) {
-		mmap.readAllKeySetAsync().whenComplete((keys, e) -> {
-			if (e != null) {
-				log.warn("error: {}", e.toString());
-				completionHandler.handle(Future.failedFuture(e));
-			} else {
-				if (keys.isEmpty()) {
-					completionHandler.handle(Future.succeededFuture());
-					return;
-				}
-				Map<K, Future> keyFutures = new HashMap<>(keys.size());
-				keys.forEach(key -> {
-					keyFutures.put(key, Future.future());
-				});
-				for (K key : keys) {
-					Future keyFuture = keyFutures.get(key);
-					mmap.getAllAsync(key).whenComplete((values, e2) -> {
-						if (e2 != null) {
-							keyFuture.fail(e2);
-						} else {
-							if (values.isEmpty()) {
-								keyFuture.complete();
-							} else {
-								List<V> deletedList = new ArrayList<>();
-								values.forEach(value -> {
-									if (p.test(value)) { // XXX
-										deletedList.add(value);
-									}
-								});
+  @SuppressWarnings({ "rawtypes", "deprecation" })
+  private void batchRemoveAllMatching(Predicate<V> p, Handler<AsyncResult<Void>> completionHandler) {
+    mmap.readAllKeySetAsync().whenComplete((keys, e) -> {
+      if (e != null) {
+        log.warn("error: {}", e.toString());
+        completionHandler.handle(Future.failedFuture(e));
+      } else {
+        if (keys.isEmpty()) {
+          completionHandler.handle(Future.succeededFuture());
+          return;
+        }
+        Map<K, Future> keyFutures = new HashMap<>(keys.size());
+        keys.forEach(key -> {
+          keyFutures.put(key, Future.future());
+        });
+        for (K key : keys) {
+          Future keyFuture = keyFutures.get(key);
+          mmap.getAllAsync(key).whenComplete((values, e2) -> {
+            if (e2 != null) {
+              keyFuture.fail(e2);
+            } else {
+              if (values.isEmpty()) {
+                keyFuture.complete();
+              } else {
+                List<V> deletedList = new ArrayList<>();
+                values.forEach(value -> {
+                  if (p.test(value)) { // XXX
+                    deletedList.add(value);
+                  }
+                });
 
-								if (deletedList.isEmpty()) {
-									keyFuture.complete();
-								} else {
-									RBatch batch = redisson.createBatch(BatchOptions.defaults()
-											.executionMode(ExecutionMode.IN_MEMORY_ATOMIC).skipResult());
-									deletedList.forEach(value -> {
-										mmap.removeAsync(key, value);
-									});
-									batch.executeAsync().whenCompleteAsync((result, e3) -> {
-										if (e != null) {
-											log.warn("key: {}, error: {}", key, e3.toString());
-											keyFuture.fail(e3);
-										} else { // XXX: skipResult() ==> result.class=<null>, result=null
-											keyFuture.complete();
-										}
-									});
-								}
-							}
-						}
-					});
-				}
-				//
-				CompositeFuture.join(new ArrayList<>(keyFutures.values())).setHandler(ar -> completionHandler
-						.handle(ar.failed() ? Future.failedFuture(ar.cause()) : Future.succeededFuture()));
-			}
-		});
-	}
+                if (deletedList.isEmpty()) {
+                  keyFuture.complete();
+                } else {
+                  RBatch batch = redisson.createBatch(BatchOptions.defaults()
+                      .executionMode(ExecutionMode.IN_MEMORY_ATOMIC).skipResult());
+                  deletedList.forEach(value -> {
+                    mmap.removeAsync(key, value);
+                  });
+                  batch.executeAsync().whenCompleteAsync((result, e3) -> {
+                    if (e != null) {
+                      log.warn("key: {}, error: {}", key, e3.toString());
+                      keyFuture.fail(e3);
+                    } else { // XXX: skipResult() ==> result.class=<null>, result=null
+                      keyFuture.complete();
+                    }
+                  });
+                }
+              }
+            }
+          });
+        }
+        //
+        CompositeFuture.join(new ArrayList<>(keyFutures.values())).setHandler(ar -> completionHandler
+            .handle(ar.failed() ? Future.failedFuture(ar.cause()) : Future.succeededFuture()));
+      }
+    });
+  }
 
-	private ChoosableSet<V> getCurrentRef(K k, Collection<V> v) {
-		ChoosableSet<V> current = choosableSetPtr.get(k);
-		ChoosableSet<V> newSet = new ChoosableSet<>(v);
-		if (current == null) {
-			ChoosableSet<V> previous = choosableSetPtr.putIfAbsent(k, newSet);
-			if (previous != null) {
-				if (!previous.equals(newSet)) {
-					choosableSetPtr.put(k, newSet);
-					// log.debug("Using newSet: {}", newSet);
-					current = newSet;
-				} else {
-					// log.debug("Using previous: {}", previous);
-					current = previous;
-				}
-			} else {
-				current = newSet;
-				// log.debug("Using newSet: {}", newSet);
-			}
-		} else {
-			if (!current.equals(newSet)) {
-				choosableSetPtr.put(k, newSet);
-				// log.debug("Using newSet: {}, old: {}", newSet, current);
-				current = newSet;
-			} else {
-				if (current.isEmpty() || newSet.isEmpty()) {
-					log.debug("Using current: {}, newSet: {}", current, newSet);
-				}
-			}
-		}
-		return current;
-	}
+  private ChoosableSet<V> getCurrentRef(K k, Collection<V> v) {
+    ChoosableSet<V> current = choosableSetPtr.get(k);
+    ChoosableSet<V> newSet = new ChoosableSet<>(vertx, v);
+    if (current == null) {
+      ChoosableSet<V> previous = choosableSetPtr.putIfAbsent(k, newSet);
+      if (previous != null) {
+        if (!previous.equals(newSet)) {
+          choosableSetPtr.put(k, newSet);
+          // log.debug("Using newSet: {}", newSet);
+          current = newSet;
+        } else {
+          // log.debug("Using previous: {}", previous);
+          current = previous;
+        }
+      } else {
+        current = newSet;
+        // log.debug("Using newSet: {}", newSet);
+      }
+    } else {
+      if (!current.equals(newSet)) {
+        choosableSetPtr.put(k, newSet);
+        // log.debug("Using newSet: {}, old: {}", newSet, current);
+        current = newSet;
+      } else {
+        if (current.isEmpty() || newSet.isEmpty()) {
+          log.debug("Using current: {}, newSet: {}", current, newSet);
+        }
+      }
+    }
+    return current;
+  }
 
-	@Override
-	public String toString() {
-		return super.toString() + "{name=" + name + "}";
-	}
+  @Override
+  public String toString() {
+    return super.toString() + "{name=" + name + "}";
+  }
 
 }
