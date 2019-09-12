@@ -247,7 +247,7 @@ class RedisMapHaInfo extends RedisMap<String, String> implements NodeAttachListe
           log.warn("Refresh TTL failed: selfNodeId: {}, counter: {}, k: {}, v: {}, error: {}", selfNodeId, counter, k, v,
               ar.cause().toString());
         } else {
-          if (counter % 5 == 0) { // Each 5 times
+          if (counter % 5 == 0) { // Each 5 times, 5=10/2
             asyncTTL.getTTL(k, ar2 -> {
               if (ar2.failed()) {
                 log.warn("Get TTL failed: selfNodeId: {}, counter: {}, k: {}, v: {}, error: {}", selfNodeId, counter, k, v,
@@ -291,11 +291,11 @@ class RedisMapHaInfo extends RedisMap<String, String> implements NodeAttachListe
     private long timeId = -1;
     private AtomicLong counter = new AtomicLong(0);
 
-    public void setAction(Consumer<Long> action) {
+    private void setAction(Consumer<Long> action) {
       this.action = action;
     }
 
-    public void start() {
+    private void start() {
       if (isStarted()) {
         log.debug("timeId: {}, selfNodeId: {}", timeId, clusterManager.getNodeID());
         return;
@@ -305,11 +305,11 @@ class RedisMapHaInfo extends RedisMap<String, String> implements NodeAttachListe
       });
     }
 
-    public boolean isStarted() {
+    private boolean isStarted() {
       return timeId != -1;
     }
 
-    public void stop() {
+    private void stop() {
       if (!isStarted()) {
         log.debug("timeId: {}, selfNodeId: {}", timeId, clusterManager.getNodeID());
         return;
