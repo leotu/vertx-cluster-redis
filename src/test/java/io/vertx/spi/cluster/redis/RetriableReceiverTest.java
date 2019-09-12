@@ -104,9 +104,9 @@ public class RetriableReceiverTest extends AsyncTestBase {
       res.result().eventBus().<String> consumer(address, message -> {
         assertNotNull(message);
         counter.incrementAndGet();
-        // if (counter.getAndIncrement() % 100 == 0) {
-        log.debug("{}, received message, clusterPort1: {}", counter, clusterPort1);
-        // }
+        if (counter.getAndIncrement() % 100 == 0) {
+          log.debug("{}, received message, clusterPort1: {}", counter, clusterPort1);
+        }
         assertTrue(message.body().startsWith("hello"));
         message.reply("ok:" + clusterPort1);
       });

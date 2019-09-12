@@ -107,10 +107,22 @@ class ExpirableMapWrapper<K, V> implements ExpirableAsync<K> {
     commandExecutor.writeAsync(key, LongCodec.INSTANCE, RedisCommands.ZADD_INT, key, zaddOptions, currentTime, field)
         .whenCompleteAsync((value, err) -> {
           if (err == null) { // java.lang.Boolean / java.lang.Long
-            // log.debug("value.class: {}, value: {}", value == null ? "<null>" : value.getClass().getName(), value);
-            Long numOfAdded = (Long) value; // num.longValue() == 0
-            // Boolean added = (Boolean) value;
-            context.runOnContext(vd -> resultHandler.handle(Future.succeededFuture(numOfAdded))); // (Boolean) value)
+            // log.debug("k: {}, value.class: {}, value: {}", k, value == null ? "<null>" : value.getClass().getName(), value);
+            Long numOfAdded;
+            if (value instanceof Integer) {
+              numOfAdded = ((Integer) value).longValue();
+            } else if (value instanceof Long) {
+              numOfAdded = (Long) value;
+            } else {
+              try {
+                numOfAdded = value == null ? 0 : Long.parseLong(value.toString());
+              } catch (NumberFormatException e) {
+                log.warn("key: {}, value: {}, error: {}", key, value, e.toString());
+                context.runOnContext(vd -> resultHandler.handle(Future.failedFuture(e)));
+                return;
+              }
+            }
+            context.runOnContext(vd -> resultHandler.handle(Future.succeededFuture(numOfAdded)));
           } else {
             context.runOnContext(vd -> resultHandler.handle(Future.failedFuture(err)));
           }
@@ -144,25 +156,25 @@ class ExpirableMapWrapper<K, V> implements ExpirableAsync<K> {
     final ByteBuf encodeMapKey = Reflection.invokeMethod(map, RedissonObject.class, "encodeMapKey",
         new Class<?>[] { Object.class }, new Object[] { k });
     final String field = encodeMapKey.toString(CharsetUtil.UTF_8);
-    log.debug("k: {}, key: {}, field: {}", k, key, field);
     final Redisson redissonImpl = ((Redisson) redisson);
     final CommandAsyncExecutor commandExecutor = redissonImpl.getCommandExecutor();
 
     commandExecutor.readAsync(key, LongCodec.INSTANCE, ZSCORE_LONG, key, field).whenCompleteAsync((value, err) -> {
       if (err == null) {
-        log.debug("value.class: {}, value: {}", value == null ? "<null>" : value.getClass().getName(), value);
+        // log.debug("value.class: {}, value: {}", value == null ? "<null>" : value.getClass().getName(), value);
         if (value == null) {
+          log.debug("(value == null), k: {}, value.class: {}, value: {}", k,
+              value == null ? "<null>" : value.getClass().getName(), value);
           resultHandler.handle(Future.succeededFuture(0L));
         } else {
           Long val = (Long) value; //
-          // log.debug("### val: {}", val);
           if (val.longValue() == 0) {
             resultHandler.handle(Future.succeededFuture(0L));
           } else {
             long nowMillis = System.currentTimeMillis();
             long valMillis = val;
             long ttlMillis = valMillis - nowMillis;
-            ZoneId zone = ZoneId.systemDefault();
+            ZoneId zone = ZoneId.systemDefault(); // XXX
             LocalDateTime now = new Date(nowMillis).toInstant().atZone(zone).toLocalDateTime(); // LocalDateTime.now();
             LocalDateTime valTime = new Date(val).toInstant().atZone(zone).toLocalDateTime();
             if (now.isAfter(valTime)) {
@@ -175,12 +187,12 @@ class ExpirableMapWrapper<K, V> implements ExpirableAsync<K> {
                 resultHandler.handle(Future
                     .failedFuture(new Exception("(ttl != ttlMillis), ttl: " + ttl + ", ttlMillis: " + ttlMillis)));
               }
-              log.debug("ttl: {}", ttl);
               resultHandler.handle(Future.succeededFuture(ttl <= 0 ? 0 : ttl));
             }
           }
         }
       } else {
+        log.warn("k: {}, error: {}", k, err.getMessage());
         resultHandler.handle(Future.failedFuture(err));
       }
     });

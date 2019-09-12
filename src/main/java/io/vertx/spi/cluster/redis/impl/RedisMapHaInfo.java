@@ -63,7 +63,7 @@ class RedisMapHaInfo extends RedisMap<String, String> implements NodeAttachListe
   private final TTLAgent ttlAgent;
   private final ExpirableAsync<String> asyncTTL;
 
-  private final Map<String, String> refreshKv = new ConcurrentHashMap<>();
+  private final Map<String, String> refreshKv = new ConcurrentHashMap<>(); // Collections.singletonMap();
 
   public RedisMapHaInfo(Vertx vertx, ClusterManager clusterManager, RedissonClient redisson, String name,
       ExpirableAsync<String> asyncTTL) {
@@ -203,19 +203,19 @@ class RedisMapHaInfo extends RedisMap<String, String> implements NodeAttachListe
   // ===
   @Override
   public String put(String key, String value) {
-    if (refreshKv.size() > 1) {
-      log.warn("(refreshKv.size() > 1), key: {}, value: {}, refreshKv.size: {}", key, value, refreshKv.size());
-    }
     refreshKv.put(key, value);
+    if (refreshKv.size() != 1) {
+      log.warn("(refreshKv.size() != 1), key: {}, value: {}, refreshKv.size: {}", key, value, refreshKv.size());
+    }
     return getMapAsync().put(key, value, timeToLiveSeconds, TimeUnit.SECONDS);
   }
 
   @Override
   public String remove(Object key) {
-    if (refreshKv.size() != 1) {
-      log.warn("(refreshKv.size() != 1), key: {}, refreshKv.size: {}", key, refreshKv.size());
-    }
     refreshKv.remove(key);
+    if (!refreshKv.isEmpty()) {
+      log.warn("(!refreshKv.isEmpty()), key: {}, refreshKv.size: {}", key, refreshKv.size());
+    }
     return super.remove(key);
   }
 
@@ -238,30 +238,53 @@ class RedisMapHaInfo extends RedisMap<String, String> implements NodeAttachListe
   private void refreshAction(long counter) {
     String selfNodeId = clusterManager.getNodeID();
     if (refreshKv.size() > 1) {
-      log.warn("(refreshKv.size() > 1), selfNodeId: {}, refreshKv.size: {}, selfNodeId: {}", selfNodeId, refreshKv.size(),
-          selfNodeId);
+      log.warn("(refreshKv.size() > 1), selfNodeId: {}, refreshKv.size: {}, counter: {}", selfNodeId, refreshKv.size(),
+          counter);
     }
     refreshKv.forEach((k, v) -> {
       asyncTTL.refreshTTLIfPresent(k, timeToLiveSeconds, TimeUnit.SECONDS, ar -> {
         if (ar.failed()) {
-          log.warn("selfNodeId: {}, counter: {}, error: {}", selfNodeId, counter, ar.cause().toString());
+          log.warn("Refresh TTL failed: selfNodeId: {}, counter: {}, k: {}, v: {}, error: {}", selfNodeId, counter, k, v,
+              ar.cause().toString());
+        } else {
+          if (counter % 5 == 0) { // Each 5 times
+            asyncTTL.getTTL(k, ar2 -> {
+              if (ar2.failed()) {
+                log.warn("Get TTL failed: selfNodeId: {}, counter: {}, k: {}, v: {}, error: {}", selfNodeId, counter, k, v,
+                    ar2.cause().toString());
+                replaceAction(selfNodeId, counter, k, v);
+              } else {
+                long ttlMillis = ar2.result();
+                long checkMillis = (freshIntervalInSeconds + 1) * 1000;
+                if (ttlMillis < checkMillis) {
+                  log.debug(
+                      "Get TTL (ttlMillis < checkMillis): selfNodeId: {}, counter: {}, k: {}, ttlMillis: {}, checkMillis: {}",
+                      selfNodeId, counter,
+                      k, ttlMillis, checkMillis);
+                  refreshAction(counter + 1); // must: "+1", don't reenter ==> (counter % 5 == 0)
+                }
+              }
+            });
+          }
         }
       });
     });
   }
 
-  //  private void refreshAction2(long counter) {
-  //    String selfNodeId = clusterManager.getNodeID();
-  //    refreshKv.forEach((k, v) -> {
-  //      getMapAsync().putIfAbsentAsync(k, v, timeToLiveSeconds, TimeUnit.SECONDS)
-  //          .whenComplete((previous, err) -> {
-  //            if (err != null) {
-  //              log.warn("selfNodeId: {}, counter: {}, k: {}, v: {}, error: {}", selfNodeId, counter, k,
-  //                  v, err.toString());
-  //            }
-  //          });
-  //    });
-  //  }
+  private void replaceAction(String selfNodeId, long counter, String k, String v) {
+    getMapAsync().fastPutAsync(k, v, timeToLiveSeconds, TimeUnit.SECONDS)
+        .whenComplete((newKey, err) -> {
+          if (err != null) {
+            log.warn("fastPutAsync: selfNodeId: {}, counter: {}, k: {}, v: {}, error: {}", selfNodeId, counter, k,
+                v, err.toString());
+          } else {
+            if (newKey) {
+              log.debug("fastPutAsync: selfNodeId: {}, counter: {}, k: {}, v: {}, newKey: {}", selfNodeId, counter, k,
+                  v, newKey);
+            }
+          }
+        });
+  }
 
   private class TTLAgent {
     private Consumer<Long> action;
