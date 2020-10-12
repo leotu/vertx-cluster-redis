@@ -30,7 +30,7 @@
 
 		<stack.version>3.8.1</stack.version> <!-- 3.7.1 -->
 		<redisson.version>3.11.2</redisson.version> <!-- 3.6.1 -->
-		<junit.version>4.12</junit.version>
+		<junit.version>4.13.1</junit.version>
 		<logback.version>1.2.3</logback.version>
 	</properties>
 
